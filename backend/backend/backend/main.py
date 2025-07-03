@@ -4,8 +4,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 import os
-from .orchestrator import MultiAgentOrchestrator
-
+from orchestrator import MultiAgentOrchestrator
 app = FastAPI(
     title="AI Document Orchestrator",
     description="Multi-agent AI orchestration platform",
