@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Document Orchestrator 2.0</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 AI Document Orchestrator 2.0</h1>
+            <p>Multi-agent intelligence for document processing and analysis</p>
+            <div class="subtitle">Apple Intelligence • Privacy-First • Multi-Agent Coordination</div>
+        </header>
+
+        <main>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number">3</div>
+                    <div class="stat-label">AI Agents</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">∞</div>
+                    <div class="stat-label">Workflows</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">🔒</div>
+                    <div class="stat-label">Privacy First</div>
+                </div>
+            </div>
+
+            <div class="orchestrator-panel">
+                <h2>🎯 Multi-Agent Orchestration</h2>
+                
+                <div class="input-section">
+                    <textarea 
+                        id="queryInput" 
+                        placeholder="Tell the AI what you need... (e.g., 'Analyze these PDFs and research market trends')"
+                        rows="3"
+                    ></textarea>
+                    
+                    <div class="file-upload-section">
+                        <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx" />
+                        <label for="fileInput" class="file-label">📎 Upload Documents</label>
+                    </div>
+                    
+                    <button onclick="executeOrchestration()" id="executeBtn" class="execute-btn">
+                        🚀 Execute Orchestration
+                    </button>
+                </div>
+
+                <div class="examples-section">
+                    <h3>💡 Example Orchestrations</h3>
+                    <div class="examples-grid">
+                        <button class="example-btn" onclick="setExample('Analyze uploaded PDFs and extract key business insights')">
+                            📊 Document Analysis & Insights
+                        </button>
+                        <button class="example-btn" onclick="setExample('Research AI automation market and create competitive analysis')">
+                            🔍 Market Research & Analysis
+                        </button>
+                        <button class="example-btn" onclick="setExample('Summarize documents and generate executive report')">
+                            📝 Summary & Report Generation
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="resultsContainer" class="results-container hidden">
+                <h2>🎯 Orchestration Results</h2>
+                <div id="agentProgress" class="agent-progress"></div>
+                <div id="finalResults" class="final-results"></div>
+            </div>
+        </main>
+
+        <footer>
+            <p>🍎 Proof of concept for Apple Intelligence integration</p>
+            <p><strong>Vision:</strong> Transform Automator into intelligent multi-agent platform</p>
+        </footer>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
