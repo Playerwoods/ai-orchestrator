@@ -1,5 +1,5 @@
 from typing import Dict, Any, List
-from .agents import FileAgent, ResearchAgent, AnalysisAgent
+from agents import FileAgent, ResearchAgent, AnalysisAgent
 import asyncio
 
 class MultiAgentOrchestrator:
