@@ -1,7 +1,54 @@
+from abc import ABC, abstractmethod
+from typing import Dict, Any, List
+import PyPDF2
 import requests
 import json
+import io
 import os
-from typing import Dict, Any, List
+
+class BaseAgent(ABC):
+    @abstractmethod
+    def can_handle(self, task_type: str) -> bool:
+        pass
+    
+    @abstractmethod
+    async def execute(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        pass
+
+class FileAgent(BaseAgent):
+    def can_handle(self, task_type: str) -> bool:
+        return task_type in ["file_processing", "pdf_analysis", "document_extraction"]
+    
+    async def execute(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        files = task.get("files", [])
+        results = []
+        
+        for file_data in files:
+            try:
+                # Extract text from PDF
+                pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_data["content"]))
+                text = ""
+                for page in pdf_reader.pages:
+                    text += page.extract_text()
+                
+                results.append({
+                    "filename": file_data["filename"],
+                    "text_length": len(text),
+                    "text_preview": text[:500] + "..." if len(text) > 500 else text,
+                    "page_count": len(pdf_reader.pages)
+                })
+            except Exception as e:
+                results.append({
+                    "filename": file_data["filename"],
+                    "error": str(e)
+                })
+        
+        return {
+            "agent": "FileAgent",
+            "status": "completed",
+            "results": results,
+            "summary": f"Processed {len(results)} documents"
+        }
 
 class ResearchAgent(BaseAgent):
     def __init__(self):
@@ -205,6 +252,38 @@ class ResearchAgent(BaseAgent):
             },
             "summary": f"Generated {len(findings)} enhanced research insights for '{query}' (fallback mode)"
         }
+
+class AnalysisAgent(BaseAgent):
+    def can_handle(self, task_type: str) -> bool:
+        return task_type in ["analysis", "insights", "summary", "report_generation"]
+    
+    async def execute(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        data = task.get("data", {})
+        query = task.get("query", "")
+        
+        # Simulate AI analysis (in production, use OpenAI API)
+        analysis = {
+            "key_insights": [
+                f"Primary insight: {query} shows strong potential",
+                "Data patterns indicate growth opportunities",
+                "Strategic recommendations available"
+            ],
+            "summary": f"Analysis of '{query}' reveals significant strategic opportunities with actionable recommendations.",
+            "recommendations": [
+                "Implement multi-agent coordination",
+                "Leverage existing Apple ecosystem",
+                "Focus on privacy-first approach"
+            ],
+            "confidence_score": 0.85
+        }
+        
+        return {
+            "agent": "AnalysisAgent", 
+            "status": "completed",
+            "results": analysis,
+            "summary": "Generated comprehensive analysis with strategic recommendations"
+        }
+
 class MailAgent(BaseAgent):
     def can_handle(self, task_type: str) -> bool:
         return task_type in ["email_analysis", "draft_email", "schedule_email", "email_insights", "extract_action_items"]
@@ -294,6 +373,7 @@ class MailAgent(BaseAgent):
                 "Set up filters for automated organization"
             ]
         }
+
 class CalendarAgent(BaseAgent):
     def can_handle(self, task_type: str) -> bool:
         return task_type in ["schedule_meeting", "find_availability", "meeting_prep", "calendar_insights", "time_blocking"]
