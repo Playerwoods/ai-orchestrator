@@ -1,5 +1,6 @@
-# Add to orchestrator.py imports
+from typing import Dict, Any, List
 from agents import FileAgent, ResearchAgent, AnalysisAgent, MailAgent, CalendarAgent
+import asyncio
 
 class MultiAgentOrchestrator:
     def __init__(self):
@@ -7,8 +8,8 @@ class MultiAgentOrchestrator:
             "file": FileAgent(),
             "research": ResearchAgent(), 
             "analysis": AnalysisAgent(),
-            "mail": MailAgent(),          # Add this
-            "calendar": CalendarAgent()   # Add this
+            "mail": MailAgent(),
+            "calendar": CalendarAgent()
         }
         
     def parse_user_intent(self, query: str) -> List[Dict[str, Any]]:
@@ -65,3 +66,46 @@ class MultiAgentOrchestrator:
             })
             
         return sorted(tasks, key=lambda x: x["priority"])
+    
+    async def execute_orchestration(self, query: str, files: List[Dict] = None) -> Dict[str, Any]:
+        """Main orchestration logic"""
+        tasks = self.parse_user_intent(query)
+        results = []
+        context = {"query": query, "files": files or []}
+        
+        for task in tasks:
+            agent_type = task["agent_type"]
+            agent = self.agents.get(agent_type)
+            
+            if agent and agent.can_handle(task["task_type"]):
+                # Prepare task data
+                task_data = {
+                    "query": query,
+                    "task_type": task["task_type"],
+                    "files": files or [],
+                    "context": context
+                }
+                
+                # Execute agent
+                result = await agent.execute(task_data)
+                results.append(result)
+                
+                # Update context for next agent
+                context[f"{agent_type}_result"] = result
+        
+        return {
+            "orchestration_id": "orch_" + str(hash(query))[:8],
+            "query": query,
+            "agents_executed": len(results),
+            "agent_results": results,
+            "final_summary": self.generate_summary(results),
+            "status": "completed"
+        }
+    
+    def generate_summary(self, results: List[Dict]) -> str:
+        """Generate overall summary of orchestration"""
+        if not results:
+            return "No agents executed"
+            
+        agent_names = [r.get("agent", "Unknown") for r in results]
+        return f"Successfully coordinated {len(results)} agents: {', '.join(agent_names)}"
