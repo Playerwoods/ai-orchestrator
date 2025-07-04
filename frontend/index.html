@@ -17,7 +17,7 @@
         <main>
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-number">3</div>
+                    <div class="stat-number">5</div>
                     <div class="stat-label">AI Agents</div>
                 </div>
                 <div class="stat-card">
@@ -36,7 +36,7 @@
                 <div class="input-section">
                     <textarea 
                         id="queryInput" 
-                        placeholder="Tell the AI what you need... (e.g., 'Analyze these PDFs and research market trends')"
+                        placeholder="Tell the AI what you need... (e.g., 'Schedule meeting about Q4 planning and draft agenda email')"
                         rows="3"
                     ></textarea>
                     
@@ -53,15 +53,55 @@
                 <div class="examples-section">
                     <h3>💡 Example Orchestrations</h3>
                     <div class="examples-grid">
+                        <button class="example-btn" onclick="setExample('Schedule a meeting about AI automation strategy and draft the agenda email')">
+                            📅 Schedule Meeting & Draft Agenda
+                        </button>
+                        <button class="example-btn" onclick="setExample('Extract action items from uploaded documents and schedule follow-up emails')">
+                            📧 Extract Action Items & Schedule Follow-ups
+                        </button>
+                        <button class="example-btn" onclick="setExample('Analyze my calendar and block time for deep work on quarterly planning')">
+                            ⏰ Calendar Analysis & Time Blocking
+                        </button>
+                        <button class="example-btn" onclick="setExample('Research AI automation market and create competitive analysis report')">
+                            🔍 Market Research & Analysis
+                        </button>
+                        <button class="example-btn" onclick="setExample('Prepare for tomorrow board meeting with document analysis and meeting prep')">
+                            🎯 Complete Meeting Preparation
+                        </button>
                         <button class="example-btn" onclick="setExample('Analyze uploaded PDFs and extract key business insights')">
                             📊 Document Analysis & Insights
                         </button>
-                        <button class="example-btn" onclick="setExample('Research AI automation market and create competitive analysis')">
-                            🔍 Market Research & Analysis
-                        </button>
-                        <button class="example-btn" onclick="setExample('Summarize documents and generate executive report')">
-                            📝 Summary & Report Generation
-                        </button>
+                    </div>
+                </div>
+
+                <div class="agent-showcase">
+                    <h3>🤖 Available Agents</h3>
+                    <div class="agent-cards">
+                        <div class="agent-card">
+                            <div class="agent-icon">📄</div>
+                            <div class="agent-name">File Agent</div>
+                            <div class="agent-desc">PDF processing, text extraction, document analysis</div>
+                        </div>
+                        <div class="agent-card">
+                            <div class="agent-icon">🔍</div>
+                            <div class="agent-name">Research Agent</div>
+                            <div class="agent-desc">Web search, market analysis, competitive intelligence</div>
+                        </div>
+                        <div class="agent-card">
+                            <div class="agent-icon">🧠</div>
+                            <div class="agent-name">Analysis Agent</div>
+                            <div class="agent-desc">AI insights, data synthesis, strategic recommendations</div>
+                        </div>
+                        <div class="agent-card">
+                            <div class="agent-icon">📧</div>
+                            <div class="agent-name">Mail Agent</div>
+                            <div class="agent-desc">Email drafting, action extraction, scheduling</div>
+                        </div>
+                        <div class="agent-card">
+                            <div class="agent-icon">📅</div>
+                            <div class="agent-name">Calendar Agent</div>
+                            <div class="agent-desc">Meeting scheduling, availability, time blocking</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -76,6 +116,9 @@
         <footer>
             <p>🍎 Proof of concept for Apple Intelligence integration</p>
             <p><strong>Vision:</strong> Transform Automator into intelligent multi-agent platform</p>
+            <div class="roadmap-note">
+                <strong>🚀 Roadmap:</strong> Native macOS integration • Safari browsing data • Apple Mail/Calendar • HomeKit automation
+            </div>
         </footer>
     </div>
 
