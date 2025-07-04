@@ -21,34 +21,294 @@ class FileAgent(BaseAgent):
     
     async def execute(self, task: Dict[str, Any]) -> Dict[str, Any]:
         files = task.get("files", [])
+        query = task.get("query", "")
         results = []
         
         for file_data in files:
             try:
                 # Extract text from PDF
                 pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_data["content"]))
-                text = ""
+                full_text = ""
                 for page in pdf_reader.pages:
-                    text += page.extract_text()
+                    full_text += page.extract_text() + "\n"
+                
+                # Generate detailed analysis
+                analysis = await self.analyze_document_content(full_text, file_data["filename"], query)
                 
                 results.append({
                     "filename": file_data["filename"],
-                    "text_length": len(text),
-                    "text_preview": text[:500] + "..." if len(text) > 500 else text,
-                    "page_count": len(pdf_reader.pages)
+                    "page_count": len(pdf_reader.pages),
+                    "word_count": len(full_text.split()),
+                    "character_count": len(full_text),
+                    "analysis": analysis,
+                    "text_preview": full_text[:800] + "..." if len(full_text) > 800 else full_text
                 })
             except Exception as e:
                 results.append({
                     "filename": file_data["filename"],
-                    "error": str(e)
+                    "error": str(e),
+                    "analysis": {"error": "Could not process this file format"}
                 })
         
         return {
             "agent": "FileAgent",
             "status": "completed",
             "results": results,
-            "summary": f"Processed {len(results)} documents"
+            "summary": f"Processed {len(results)} documents with detailed analysis"
         }
+    
+    async def analyze_document_content(self, text: str, filename: str, query: str = "") -> Dict[str, Any]:
+        """Generate comprehensive document analysis"""
+        
+        # Basic text analysis
+        words = text.split()
+        sentences = text.split('.')
+        paragraphs = text.split('\n\n')
+        
+        # Extract key information
+        key_insights = self.extract_key_insights(text, query)
+        document_structure = self.analyze_document_structure(text)
+        important_sections = self.find_important_sections(text)
+        
+        return {
+            "document_type": self.classify_document_type(text, filename),
+            "executive_summary": self.generate_executive_summary(text, query),
+            "key_insights": key_insights,
+            "important_sections": important_sections,
+            "document_structure": document_structure,
+            "statistics": {
+                "total_words": len(words),
+                "total_sentences": len([s for s in sentences if s.strip()]),
+                "total_paragraphs": len([p for p in paragraphs if p.strip()]),
+                "reading_time_minutes": max(1, len(words) // 200)
+            },
+            "key_topics": self.extract_key_topics(text),
+            "action_items": self.extract_action_items(text),
+            "important_dates": self.extract_dates(text),
+            "numerical_data": self.extract_numbers_and_metrics(text),
+            "recommendations": self.generate_recommendations(text, query)
+        }
+    
+    def classify_document_type(self, text: str, filename: str) -> str:
+        """Classify the type of document"""
+        text_lower = text.lower()
+        
+        if any(word in text_lower for word in ["financial", "revenue", "profit", "budget", "quarterly"]):
+            return "Financial Report"
+        elif any(word in text_lower for word in ["strategy", "strategic", "planning", "objectives"]):
+            return "Strategic Document"
+        elif any(word in text_lower for word in ["meeting", "agenda", "minutes", "discussion"]):
+            return "Meeting Document"
+        elif any(word in text_lower for word in ["proposal", "recommendation", "suggest"]):
+            return "Proposal/Recommendation"
+        elif any(word in text_lower for word in ["research", "analysis", "study", "findings"]):
+            return "Research Document"
+        else:
+            return "Business Document"
+    
+    def generate_executive_summary(self, text: str, query: str = "") -> str:
+        """Generate a comprehensive executive summary"""
+        
+        # Find key sentences (simple approach)
+        sentences = [s.strip() for s in text.split('.') if s.strip() and len(s.strip()) > 50]
+        
+        if not sentences:
+            return "Document appears to be primarily non-text content or very short."
+        
+        # Take key sentences from beginning, middle, and end
+        key_sentences = []
+        if len(sentences) >= 3:
+            key_sentences.append(sentences[0])  # Opening
+            key_sentences.append(sentences[len(sentences)//2])  # Middle
+            key_sentences.append(sentences[-1])  # Conclusion
+        else:
+            key_sentences = sentences
+        
+        summary = "EXECUTIVE SUMMARY:\n\n"
+        
+        if query:
+            summary += f"Related to your query '{query}':\n"
+        
+        summary += f"This document contains {len(sentences)} key points. "
+        summary += "Main themes include:\n\n"
+        
+        for i, sentence in enumerate(key_sentences[:3], 1):
+            summary += f"{i}. {sentence[:200]}...\n"
+        
+        return summary
+    
+    def extract_key_insights(self, text: str, query: str = "") -> List[str]:
+        """Extract key insights from the document"""
+        insights = []
+        text_lower = text.lower()
+        
+        # Look for insight indicators
+        insight_markers = [
+            "key finding", "important", "significant", "critical", "essential",
+            "conclusion", "result", "outcome", "recommendation", "suggest"
+        ]
+        
+        sentences = text.split('.')
+        for sentence in sentences:
+            if any(marker in sentence.lower() for marker in insight_markers):
+                clean_sentence = sentence.strip()
+                if len(clean_sentence) > 30:
+                    insights.append(clean_sentence[:300])
+        
+        # If query provided, look for query-related insights
+        if query:
+            query_words = query.lower().split()
+            for sentence in sentences:
+                if any(word in sentence.lower() for word in query_words):
+                    clean_sentence = sentence.strip()
+                    if len(clean_sentence) > 30 and clean_sentence not in insights:
+                        insights.append(f"Query-related: {clean_sentence[:300]}")
+        
+        return insights[:8]  # Return top 8 insights
+    
+    def analyze_document_structure(self, text: str) -> Dict[str, Any]:
+        """Analyze the structure of the document"""
+        lines = text.split('\n')
+        
+        # Count different types of content
+        headings = [line for line in lines if line.strip() and line.strip().isupper() and len(line.strip()) < 100]
+        bullet_points = [line for line in lines if line.strip().startswith(('•', '-', '*', '1.', '2.', '3.'))]
+        
+        return {
+            "total_lines": len(lines),
+            "non_empty_lines": len([line for line in lines if line.strip()]),
+            "potential_headings": len(headings),
+            "bullet_points": len(bullet_points),
+            "has_structured_content": len(bullet_points) > 3 or len(headings) > 2
+        }
+    
+    def find_important_sections(self, text: str) -> List[Dict[str, str]]:
+        """Find and extract important sections"""
+        sections = []
+        
+        # Look for numbered sections or clear headings
+        paragraphs = text.split('\n\n')
+        
+        for i, paragraph in enumerate(paragraphs):
+            if len(paragraph.strip()) > 100:  # Substantial content
+                # Check if it seems important
+                if any(word in paragraph.lower() for word in [
+                    'summary', 'conclusion', 'recommendation', 'key', 'important', 
+                    'objective', 'goal', 'strategy', 'result', 'finding'
+                ]):
+                    sections.append({
+                        "section_number": i + 1,
+                        "content": paragraph.strip()[:400] + "..." if len(paragraph) > 400 else paragraph.strip(),
+                        "importance": "high"
+                    })
+        
+        return sections[:5]  # Return top 5 sections
+    
+    def extract_key_topics(self, text: str) -> List[str]:
+        """Extract key topics/themes from the document"""
+        text_lower = text.lower()
+        
+        # Common business topics
+        topics = []
+        topic_keywords = {
+            "Financial Performance": ["revenue", "profit", "budget", "cost", "financial", "earnings"],
+            "Strategy & Planning": ["strategy", "strategic", "plan", "objective", "goal", "vision"],
+            "Operations": ["operations", "process", "efficiency", "workflow", "management"],
+            "Technology": ["technology", "system", "software", "digital", "automation", "ai"],
+            "Market Analysis": ["market", "competition", "customer", "industry", "trend"],
+            "Risk Management": ["risk", "compliance", "security", "regulation", "policy"],
+            "Human Resources": ["employee", "team", "staff", "training", "performance"],
+            "Innovation": ["innovation", "development", "research", "new", "improvement"]
+        }
+        
+        for topic, keywords in topic_keywords.items():
+            if any(keyword in text_lower for keyword in keywords):
+                topics.append(topic)
+        
+        return topics
+    
+    def extract_action_items(self, text: str) -> List[str]:
+        """Extract action items from the document"""
+        action_items = []
+        
+        # Look for action-oriented language
+        action_patterns = [
+            "action item", "to do", "next step", "follow up", "implement", 
+            "execute", "complete", "deliver", "schedule", "assign"
+        ]
+        
+        sentences = text.split('.')
+        for sentence in sentences:
+            if any(pattern in sentence.lower() for pattern in action_patterns):
+                clean_sentence = sentence.strip()
+                if len(clean_sentence) > 20:
+                    action_items.append(clean_sentence[:200])
+        
+        return action_items[:6]  # Return top 6 action items
+    
+    def extract_dates(self, text: str) -> List[str]:
+        """Extract important dates from the document"""
+        import re
+        
+        # Simple date patterns
+        date_patterns = [
+            r'\b\d{1,2}/\d{1,2}/\d{4}\b',  # MM/DD/YYYY
+            r'\b\d{1,2}-\d{1,2}-\d{4}\b',  # MM-DD-YYYY
+            r'\b\w+ \d{1,2}, \d{4}\b',     # Month DD, YYYY
+            r'\bQ[1-4] \d{4}\b'            # Q1 2024
+        ]
+        
+        dates = []
+        for pattern in date_patterns:
+            matches = re.findall(pattern, text)
+            dates.extend(matches)
+        
+        return list(set(dates))[:8]  # Return unique dates
+    
+    def extract_numbers_and_metrics(self, text: str) -> List[str]:
+        """Extract important numbers and metrics"""
+        import re
+        
+        # Look for percentages, currency, and significant numbers
+        patterns = [
+            r'\b\d+%\b',  # Percentages
+            r'\$[\d,]+(?:\.\d{2})?\b',  # Currency
+            r'\b\d{1,3}(?:,\d{3})*(?:\.\d+)?\b'  # Large numbers
+        ]
+        
+        metrics = []
+        for pattern in patterns:
+            matches = re.findall(pattern, text)
+            metrics.extend(matches)
+        
+        return list(set(metrics))[:10]  # Return top 10 unique metrics
+    
+    def generate_recommendations(self, text: str, query: str = "") -> List[str]:
+        """Generate recommendations based on document content"""
+        recommendations = []
+        
+        # Generic recommendations based on document type
+        text_lower = text.lower()
+        
+        if "financial" in text_lower:
+            recommendations.append("Consider regular financial performance reviews")
+            recommendations.append("Monitor key financial metrics monthly")
+        
+        if "strategy" in text_lower:
+            recommendations.append("Develop detailed implementation timeline")
+            recommendations.append("Assign clear ownership for strategic initiatives")
+        
+        if "risk" in text_lower:
+            recommendations.append("Implement risk monitoring dashboard")
+            recommendations.append("Schedule regular risk assessment reviews")
+        
+        if query:
+            recommendations.append(f"Focus on sections related to '{query}' for immediate action")
+        
+        recommendations.append("Schedule follow-up meeting to discuss document findings")
+        recommendations.append("Share key insights with relevant stakeholders")
+        
+        return recommendations[:5]
 
 class ResearchAgent(BaseAgent):
     def __init__(self):
