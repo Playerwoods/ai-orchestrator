@@ -730,3 +730,215 @@ class MailAgent(BaseAgent):
             "results": result,
             "summary": f"Email operation completed: {task_type}"
         }
+    
+    async def draft_email(self, query: str) -> Dict[str, Any]:
+        return {
+            "action": "draft_email",
+            "subject": f"Re: {query}",
+            "draft_content": f"Based on your request '{query}', here's a professional email draft:\n\nDear [Recipient],\n\nI hope this email finds you well. Regarding {query}, I wanted to provide you with an update...\n\nBest regards,\n[Your Name]",
+            "suggestions": [
+                "Add specific details about the topic",
+                "Include relevant attachments",
+                "Set appropriate priority level"
+            ]
+        }
+    
+    async def extract_action_items(self, query: str) -> Dict[str, Any]:
+        return {
+            "action": "extract_action_items",
+            "action_items": [
+                f"Follow up on {query} by end of week",
+                "Schedule meeting with stakeholders",
+                "Prepare summary report",
+                "Send updates to team members"
+            ],
+            "priority_items": [
+                f"High priority: Review {query} documents",
+                "Medium priority: Coordinate with external partners"
+            ],
+            "deadlines": [
+                "This week: Initial review",
+                "Next week: Final deliverables"
+            ]
+        }
+    
+    async def schedule_email(self, query: str) -> Dict[str, Any]:
+        return {
+            "action": "schedule_email",
+            "scheduled_time": "Tomorrow 9:00 AM",
+            "recipients": ["team@company.com"],
+            "subject": f"Scheduled update: {query}",
+            "status": "Email scheduled successfully"
+        }
+    
+    async def analyze_emails(self, query: str) -> Dict[str, Any]:
+        return {
+            "action": "analyze_emails",
+            "email_summary": {
+                "total_emails": 47,
+                "unread_count": 12,
+                "priority_emails": 5,
+                "action_required": 8
+            },
+            "key_insights": [
+                f"3 emails mention '{query}' requiring immediate attention",
+                "2 meeting requests pending response",
+                "1 urgent deadline approaching this week"
+            ],
+            "recommendations": [
+                "Prioritize emails from key stakeholders",
+                "Batch process non-urgent emails",
+                "Set up filters for automated organization"
+            ]
+        }
+
+class CalendarAgent(BaseAgent):
+    def can_handle(self, task_type: str) -> bool:
+        return task_type in ["schedule_meeting", "find_availability", "meeting_prep", "calendar_insights", "time_blocking"]
+    
+    async def execute(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        query = task.get("query", "")
+        task_type = task.get("task_type", "")
+        
+        if "schedule" in query.lower() or "meeting" in query.lower():
+            result = await self.schedule_meeting(query)
+        elif "available" in query.lower() or "free" in query.lower():
+            result = await self.find_availability(query)
+        elif "prepare" in query.lower() or "prep" in query.lower():
+            result = await self.meeting_prep(query)
+        elif "block" in query.lower() or "focus" in query.lower():
+            result = await self.time_blocking(query)
+        else:
+            result = await self.calendar_insights(query)
+        
+        return {
+            "agent": "CalendarAgent",
+            "status": "completed", 
+            "results": result,
+            "summary": f"Calendar operation completed: {task_type}"
+        }
+    
+    async def schedule_meeting(self, query: str) -> Dict[str, Any]:
+        return {
+            "action": "schedule_meeting",
+            "meeting_details": {
+                "title": f"Meeting: {query}",
+                "proposed_times": [
+                    "Tomorrow 2:00 PM - 3:00 PM",
+                    "Friday 10:00 AM - 11:00 AM",
+                    "Monday 3:00 PM - 4:00 PM"
+                ],
+                "attendees": ["stakeholder1@company.com", "stakeholder2@company.com"],
+                "location": "Conference Room A / Zoom",
+                "agenda": [
+                    f"Discuss {query}",
+                    "Review progress and next steps",
+                    "Assign action items",
+                    "Schedule follow-up"
+                ]
+            },
+            "conflicts_resolved": 2,
+            "invitations_sent": True
+        }
+    
+    async def find_availability(self, query: str) -> Dict[str, Any]:
+        return {
+            "action": "find_availability",
+            "available_slots": [
+                {
+                    "date": "Tomorrow",
+                    "times": ["9:00 AM - 10:00 AM", "2:00 PM - 4:00 PM", "5:00 PM - 6:00 PM"]
+                },
+                {
+                    "date": "Friday",
+                    "times": ["10:00 AM - 12:00 PM", "1:00 PM - 3:00 PM"]
+                }
+            ],
+            "busy_periods": [
+                "Today 10:00 AM - 12:00 PM (Team Meeting)",
+                "Tomorrow 11:00 AM - 1:00 PM (Client Call)"
+            ],
+            "recommendations": [
+                "Best time for focused work: Tomorrow 2:00 PM - 4:00 PM",
+                "Optimal meeting slots: Friday morning",
+                "Avoid scheduling during lunch hours"
+            ]
+        }
+    
+    async def meeting_prep(self, query: str) -> Dict[str, Any]:
+        return {
+            "action": "meeting_prep",
+            "preparation_checklist": [
+                f"Review documents related to {query}",
+                "Prepare agenda and talking points",
+                "Gather relevant data and metrics",
+                "Test technology and equipment"
+            ],
+            "required_materials": [
+                "Quarterly reports",
+                "Project status updates", 
+                "Budget spreadsheets",
+                "Presentation slides"
+            ],
+            "attendee_info": {
+                "total_attendees": 6,
+                "key_stakeholders": ["CEO", "CTO", "Product Manager"],
+                "preparation_time_needed": "30 minutes"
+            },
+            "meeting_context": f"Strategic discussion about {query} with senior leadership"
+        }
+    
+    async def time_blocking(self, query: str) -> Dict[str, Any]:
+        return {
+            "action": "time_blocking",
+            "blocks_created": [
+                {
+                    "time": "9:00 AM - 11:00 AM",
+                    "activity": f"Deep work: {query}",
+                    "type": "Focus time"
+                },
+                {
+                    "time": "11:00 AM - 12:00 PM", 
+                    "activity": "Email processing",
+                    "type": "Administrative"
+                },
+                {
+                    "time": "2:00 PM - 4:00 PM",
+                    "activity": "Meetings and calls",
+                    "type": "Collaboration"
+                }
+            ],
+            "productivity_tips": [
+                "Turn off notifications during focus blocks",
+                "Batch similar tasks together",
+                "Leave buffer time between meetings"
+            ],
+            "week_overview": "Optimized schedule for maximum productivity"
+        }
+    
+    async def calendar_insights(self, query: str) -> Dict[str, Any]:
+        return {
+            "action": "calendar_insights",
+            "weekly_summary": {
+                "total_meetings": 18,
+                "meeting_hours": 12,
+                "focus_time": 25,
+                "busiest_day": "Wednesday",
+                "lightest_day": "Friday"
+            },
+            "patterns": [
+                "Most productive hours: 9:00 AM - 11:00 AM",
+                "Meeting-heavy days: Tuesday, Wednesday",
+                "Best days for deep work: Monday, Friday"
+            ],
+            "recommendations": [
+                "Block more focus time on busy days",
+                "Move routine meetings to lighter days",
+                "Consider no-meeting Fridays"
+            ],
+            "upcoming_priorities": [
+                f"Important: {query} discussion next week",
+                "Quarterly review preparation",
+                "Team one-on-ones scheduled"
+            ]
+        }
