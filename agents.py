@@ -733,7 +733,6 @@ class MailAgent(BaseAgent):
         # Simulate email scheduling
         return {
             "action": "schedule_email",
-            "scheduled_time": "Tomorrow 9
             "scheduled_time": "Tomorrow 9:00 AM",
            "recipients": ["team@company.com"],
            "subject": f"Scheduled update: {query}",
