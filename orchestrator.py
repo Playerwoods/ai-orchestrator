@@ -10,6 +10,7 @@ class MultiAgentOrchestrator:
             "analysis": AnalysisAgent(),
             "mail": MailAgent(),
             "calendar": CalendarAgent()
+            "spotlight": SpotlightAgent()
         }
         
     def parse_user_intent(self, query: str) -> List[Dict[str, Any]]:
