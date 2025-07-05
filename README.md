@@ -1,4 +1,4 @@
-# AI Document Orchestrator 2.0
+# Apple AI Orchestrator 2.0
 
 Multi-agent AI orchestration platform demonstrating Apple Intelligence integration potential.
 
