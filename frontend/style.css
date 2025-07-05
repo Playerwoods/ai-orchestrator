@@ -544,3 +544,155 @@ footer p {
         grid-template-columns: 1fr;
     }
 }
+/* Automator Mascot Styles */
+.automator-mascot {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    animation: slideInRight 1s ease-out;
+}
+
+.mascot-body {
+    width: 80px;
+    height: 100px;
+    background: linear-gradient(135deg, #007AFF, #5AC8FA);
+    border-radius: 20px;
+    position: relative;
+    animation: float 3s ease-in-out infinite;
+    box-shadow: 0 8px 32px rgba(0, 122, 255, 0.3);
+}
+
+.mascot-head {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #FFFFFF, #F2F2F7);
+    border-radius: 50%;
+    position: absolute;
+    top: -20px;
+    left: 10px;
+    border: 3px solid #007AFF;
+}
+
+.mascot-eyes {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 15px;
+}
+
+.eye {
+    width: 8px;
+    height: 8px;
+    background: #007AFF;
+    border-radius: 50%;
+    animation: blink 4s infinite;
+}
+
+.mascot-smile {
+    width: 20px;
+    height: 10px;
+    border: 2px solid #007AFF;
+    border-top: none;
+    border-radius: 0 0 20px 20px;
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.apple-logo {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 24px;
+    animation: glow 2s ease-in-out infinite alternate;
+}
+
+.speech-bubble {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 15px;
+    margin-top: 10px;
+    max-width: 250px;
+    position: relative;
+    border: 2px solid rgba(0, 122, 255, 0.2);
+    animation: fadeInUp 1s ease-out 0.5s both;
+}
+
+.speech-bubble::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 30px;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid rgba(255, 255, 255, 0.95);
+}
+
+.speech-bubble p {
+    margin: 0;
+    color: #1D1D1F;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+/* Animations */
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+@keyframes blink {
+    0%, 90%, 100% {
+        transform: scaleY(1);
+    }
+    95% {
+        transform: scaleY(0.1);
+    }
+}
+
+@keyframes glow {
+    from {
+        text-shadow: 0 0 5px rgba(0, 122, 255, 0.5);
+    }
+    to {
+        text-shadow: 0 0 20px rgba(0, 122, 255, 0.8);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Hide mascot on mobile */
+@media (max-width: 768px) {
+    .automator-mascot {
+        display: none;
+    }
+}
