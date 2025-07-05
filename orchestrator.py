@@ -1,17 +1,28 @@
-from typing import Dict, Any, List
-from agents import FileAgent, ResearchAgent, AnalysisAgent, MailAgent, CalendarAgent
-import asyncio
+# agents.py
 
-class MultiAgentOrchestrator:
-    def __init__(self):
-        self.agents = {
-            "file": FileAgent(),
-            "research": ResearchAgent(), 
-            "analysis": AnalysisAgent(),
-            "mail": MailAgent(),
-            "calendar": CalendarAgent(),
-            "spotlight": SpotlightAgent()
-        }
+from abc import ABC, abstractmethod
+from typing import Dict, Any, List, Optional
+import PyPDF2
+import requests
+import json
+import io
+import os
+import sys
+import subprocess
+import re
+
+# Make sure all classes are properly defined and exported
+__all__ = [
+    'BaseAgent',
+    'SpotlightAgent', 
+    'FileAgent',
+    'ResearchAgent',
+    'AnalysisAgent',
+    'MailAgent',
+    'CalendarAgent'
+]
+
+# [Rest of your agent classes code goes here - the corrected code from the previous artifact]
         
     def parse_user_intent(self, query: str) -> List[Dict[str, Any]]:
         """Convert natural language query into agent tasks"""
