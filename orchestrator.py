@@ -201,10 +201,11 @@ class MultiAgentOrchestrator:
         
         return await self.execute_task(task)
     
-    async def execute_orchestration(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_orchestration(self, task: Dict[str, Any], *args, **kwargs) -> Dict[str, Any]:
         """
         Main orchestration method that the frontend calls.
         This is the entry point for all task execution.
+        Handles variable arguments for backward compatibility.
         """
         # Handle different request formats for backward compatibility
         
@@ -231,5 +232,7 @@ class MultiAgentOrchestrator:
         return {
             "status": "error",
             "message": "Invalid task format. Expected 'task_type', 'files', or 'query'",
-            "received_keys": list(task.keys())
+            "received_keys": list(task.keys()),
+            "args_received": len(args),
+            "kwargs_received": list(kwargs.keys()) if kwargs else []
         }
