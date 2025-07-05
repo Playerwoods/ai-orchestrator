@@ -1,20 +1,142 @@
-from abc import ABC, abstractmethod
+rom abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional
 import PyPDF2
 import requests
 import json
 import io
 import os
+import sys
+import subprocess
 import re
 
 class BaseAgent(ABC):
+    """Abstract base class for all agents, defining the common interface."""
     @abstractmethod
     def can_handle(self, task_type: str) -> bool:
+        """Determines if the agent can handle a given task type."""
         pass
     
     @abstractmethod
     async def execute(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        """Executes the task and returns the result."""
         pass
+
+class SpotlightAgent(BaseAgent):
+    """
+    Agent for performing local file searches using macOS Spotlight.
+    This provides a fast, privacy-preserving way to find local files.
+    """
+    def can_handle(self, task_type: str) -> bool:
+        """Handles tasks related to local macOS Spotlight searches."""
+        return task_type == "spotlight_search"
+
+    async def execute(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Executes a Spotlight search on the local machine.
+
+        Args:
+            task: A dictionary containing a 'query' for the search.
+
+        Returns:
+            A dictionary with the search results or an error if not on macOS.
+        """
+        # Spotlight is only available on macOS.
+        if sys.platform != "darwin":
+            return {
+                "agent": "SpotlightAgent",
+                "status": "failed",
+                "results": {
+                    "error": "SpotlightAgent is only available on macOS."
+                },
+                "summary": "Operation failed: Incompatible operating system."
+            }
+
+        query = task.get("query")
+        if not query:
+            return {
+                "agent": "SpotlightAgent",
+                "status": "failed",
+                "results": {"error": "No query provided for Spotlight search."},
+                "summary": "Operation failed: Missing query."
+            }
+
+        try:
+            # Use `mdfind` to search the Spotlight index.
+            mdfind_cmd = ["mdfind", query]
+            process = subprocess.run(mdfind_cmd, capture_output=True, text=True, check=False)
+
+            if process.returncode != 0 or not process.stdout.strip():
+                return {
+                    "agent": "SpotlightAgent",
+                    "status": "completed",
+                    "results": {
+                        "query": query,
+                        "found_items": []
+                    },
+                    "summary": f"No Spotlight results found for '{query}'."
+                }
+
+            # Get the list of file paths, limiting to the top 15 results.
+            paths = process.stdout.strip().split('\n')[:15]
+            
+            results = []
+            for path in paths:
+                if not path:
+                    continue
+                
+                # Use `mdls` to get metadata for each file.
+                try:
+                    mdls_cmd = ["mdls", path]
+                    mdls_process = subprocess.run(mdls_cmd, capture_output=True, text=True, check=True)
+                    
+                    # Extract specific, useful metadata fields.
+                    kind = self._extract_mdls_field(mdls_process.stdout, "kMDItemKind")
+                    last_used = self._extract_mdls_field(mdls_process.stdout, "kMDItemLastUsedDate")
+                    
+                    results.append({
+                        "path": path,
+                        "filename": os.path.basename(path),
+                        "kind": kind,
+                        "last_used": last_used
+                    })
+                except subprocess.CalledProcessError:
+                    # If mdls fails for a specific file, just add the path.
+                    results.append({
+                        "path": path,
+                        "filename": os.path.basename(path),
+                        "kind": "Unknown (metadata unavailable)",
+                        "last_used": None
+                    })
+            
+            return {
+                "agent": "SpotlightAgent",
+                "status": "completed",
+                "results": {
+                    "query": query,
+                    "found_items": results
+                },
+                "summary": f"Spotlight found {len(results)} results for '{query}' on your Mac."
+            }
+
+        except Exception as e:
+            return {
+                "agent": "SpotlightAgent",
+                "status": "error",
+                "results": {"error": str(e)},
+                "summary": "An error occurred during the Spotlight search."
+            }
+
+    def _extract_mdls_field(self, mdls_output: str, field_name: str) -> Optional[str]:
+        """
+        Parses the output of the `mdls` command to extract a specific field's value.
+        Example line: kMDItemKind = "PDF document"
+        """
+        # Regex to find the field and capture its value, which might be in quotes.
+        match = re.search(rf'{field_name}\s*=\s*"?([^"\n]+)"?', mdls_output)
+        if match:
+            value = match.group(1).strip()
+            return value if value != "(null)" else None
+        return None
 
 class FileAgent(BaseAgent):
     def can_handle(self, task_type: str) -> bool:
