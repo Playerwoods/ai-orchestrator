@@ -23,8 +23,37 @@ class MultiAgentOrchestrator:
             "calendar": CalendarAgent()
         }
     
-    def get_available_agents(self) -> List[str]:
-        return list(self.agents.keys())
+    def get_available_agents(self) -> Dict[str, Any]:
+        """Return detailed info about available agents."""
+        import sys
+        
+        agents_info = {}
+        active_count = 0
+        
+        for name, agent in self.agents.items():
+            available = True
+            status = "active"
+            
+            # Check platform compatibility
+            if name == "spotlight" and sys.platform != "darwin":
+                available = False
+                status = "unavailable (macOS only)"
+            
+            if available:
+                active_count += 1
+            
+            agents_info[name] = {
+                "class": agent.__class__.__name__,
+                "status": status,
+                "available": available
+            }
+        
+        return {
+            "total_defined": len(self.agents),
+            "active_agents": active_count,
+            "agents": agents_info,
+            "platform": sys.platform
+        }
     
     def find_capable_agents(self, task_type: str) -> List[str]:
         capable_agents = []
@@ -109,11 +138,35 @@ class MultiAgentOrchestrator:
             "capabilities": self._get_all_task_types()
         }
         
+        active_agents = 0
+        
         for name, agent in self.agents.items():
+            # Check if agent is platform-compatible
+            available = True
+            platform_note = ""
+            
+            if name == "spotlight":
+                import sys
+                if sys.platform != "darwin":
+                    available = False
+                    platform_note = "macOS only - not available on current platform"
+                else:
+                    platform_note = "macOS native integration"
+            
+            if available:
+                active_agents += 1
+            
             status["agents"][name] = {
                 "class": agent.__class__.__name__,
-                "available": True
+                "available": available,
+                "platform_note": platform_note if platform_note else "Cross-platform compatible"
             }
+        
+        status["active_agents"] = active_agents
+        status["platform_info"] = {
+            "current_platform": __import__('sys').platform,
+            "spotlight_available": __import__('sys').platform == "darwin"
+        }
         
         return status
     
@@ -147,3 +200,36 @@ class MultiAgentOrchestrator:
         }
         
         return await self.execute_task(task)
+    
+    async def execute_orchestration(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Main orchestration method that the frontend calls.
+        This is the entry point for all task execution.
+        """
+        # Handle different request formats for backward compatibility
+        
+        # If it's a direct task, execute it
+        if "task_type" in task:
+            return await self.execute_task(task)
+        
+        # Handle file processing requests
+        if "files" in task:
+            # Auto-detect this is a file processing task
+            file_task = {
+                "task_type": "file_processing",
+                "files": task.get("files"),
+                "query": task.get("query", ""),
+                **task  # Include any other parameters
+            }
+            return await self.execute_task(file_task)
+        
+        # Handle query-based requests
+        if "query" in task:
+            return await self.route_task_intelligently(task["query"], task)
+        
+        # Fallback for unrecognized format
+        return {
+            "status": "error",
+            "message": "Invalid task format. Expected 'task_type', 'files', or 'query'",
+            "received_keys": list(task.keys())
+        }
