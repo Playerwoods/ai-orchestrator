@@ -9,7 +9,7 @@ class MultiAgentOrchestrator:
             "research": ResearchAgent(), 
             "analysis": AnalysisAgent(),
             "mail": MailAgent(),
-            "calendar": CalendarAgent()
+            "calendar": CalendarAgent(),
             "spotlight": SpotlightAgent()
         }
         
