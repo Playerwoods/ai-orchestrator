@@ -148,3 +148,77 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+// Automator Mascot Introduction
+const mascotMessages = [
+    "Hello! I'm your AI Automator assistant. Let me introduce our agent team! 🤖",
+    "Meet our File Agent 📄 - Expert at analyzing documents and extracting insights!",
+    "Our Research Agent 🔍 - Searches the web for real-time market intelligence!",
+    "The Analysis Agent 🧠 - Synthesizes data into strategic recommendations!",
+    "Our Mail Agent 📧 - Drafts professional emails and extracts action items!",
+    "And our Calendar Agent 📅 - Manages schedules and optimizes your time!",
+    "Together, we orchestrate intelligent workflows that would make Apple proud! 🍎",
+    "Ready to see multi-agent coordination in action? Try one of the examples below! 🚀"
+];
+
+let currentMessageIndex = 0;
+let isIntroPlaying = false;
+
+function startMascotIntroduction() {
+    if (isIntroPlaying) return;
+    
+    isIntroPlaying = true;
+    const speechBubble = document.getElementById('speechBubble');
+    const mascotText = document.getElementById('mascotText');
+    
+    function showNextMessage() {
+        if (currentMessageIndex < mascotMessages.length) {
+            // Fade out
+            speechBubble.style.opacity = '0';
+            
+            setTimeout(() => {
+                // Change text
+                mascotText.textContent = mascotMessages[currentMessageIndex];
+                
+                // Fade in
+                speechBubble.style.opacity = '1';
+                currentMessageIndex++;
+                
+                // Schedule next message
+                setTimeout(showNextMessage, 3000);
+            }, 300);
+        } else {
+            // Introduction complete - hide mascot after a delay
+            setTimeout(() => {
+                const mascot = document.getElementById('automatorMascot');
+                mascot.style.animation = 'slideInRight 1s ease-out reverse';
+                setTimeout(() => {
+                    mascot.style.display = 'none';
+                    isIntroPlaying = false;
+                }, 1000);
+            }, 2000);
+        }
+    }
+    
+    // Start the introduction
+    setTimeout(showNextMessage, 2000);
+}
+
+// Start introduction when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(startMascotIntroduction, 1000);
+});
+
+// Add click handler to replay introduction
+document.addEventListener('DOMContentLoaded', function() {
+    const mascot = document.getElementById('automatorMascot');
+    if (mascot) {
+        mascot.addEventListener('click', function() {
+            if (!isIntroPlaying) {
+                currentMessageIndex = 0;
+                mascot.style.display = 'block';
+                mascot.style.animation = 'slideInRight 1s ease-out';
+                startMascotIntroduction();
+            }
+        });
+    }
+});
