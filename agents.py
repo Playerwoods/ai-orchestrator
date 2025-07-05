@@ -670,15 +670,12 @@ class AnalysisAgent(BaseAgent):
             "results": analysis,
             "summary": "Generated comprehensive analysis with strategic recommendations"
         }
-
 class MailAgent(BaseAgent):
     def can_handle(self, task_type: str) -> bool:
         return task_type in ["email_analysis", "draft_email", "schedule_email", "email_insights", "extract_action_items"]
-    
     async def execute(self, task: Dict[str, Any]) -> Dict[str, Any]:
         query = task.get("query", "")
         task_type = task.get("task_type", "")
-        
         # Simulate different email operations
         if "draft" in query.lower() or task_type == "draft_email":
             result = await self.draft_email(query)
@@ -695,7 +692,6 @@ class MailAgent(BaseAgent):
             "results": result,
             "summary": f"Email operation completed: {task_type}"
         }
-    
     async def draft_email(self, query: str) -> Dict[str, Any]:
         # Simulate email drafting based on query
         return {
@@ -708,7 +704,6 @@ class MailAgent(BaseAgent):
                 "Set appropriate priority level"
             ]
         }
-    
     async def extract_action_items(self, query: str) -> Dict[str, Any]:
         # Simulate action item extraction
         return {
@@ -738,7 +733,6 @@ class MailAgent(BaseAgent):
            "subject": f"Scheduled update: {query}",
            "status": "Email scheduled successfully"
        }
-   
    async def analyze_emails(self, query: str) -> Dict[str, Any]:
        # Simulate email analysis
        return {
