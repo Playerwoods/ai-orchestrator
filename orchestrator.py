@@ -1,8 +1,10 @@
 from typing import Dict, Any, List
 import asyncio
 import sys
+import traceback
 
 # Import all agent classes
+# Make sure this path is correct for your project structure
 from agents import (
     BaseAgent,
     SpotlightAgent,
@@ -34,18 +36,17 @@ class MultiAgentOrchestrator:
     async def execute_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         task_type = task.get("task_type", "")
         if not task_type:
-            return {"status": "error", "message": "No task_type specified"}
+            return {"status": "error", "message": "No task_type specified in task payload"}
         
         capable_agents = self.find_capable_agents(task_type)
         if not capable_agents:
-            return {"status": "error", "message": f"No agent found for task: {task_type}"}
+            return {"status": "error", "message": f"No agent found for task type: {task_type}"}
         
         agent_name = capable_agents[0]
         agent = self.agents[agent_name]
         
         try:
             result = await agent.execute(task)
-            # Add orchestrator info without overwriting existing keys
             if "orchestrator_info" not in result:
                 result["orchestrator_info"] = {}
             result["orchestrator_info"].update({
@@ -54,141 +55,161 @@ class MultiAgentOrchestrator:
             })
             return result
         except Exception as e:
-            # Provide more detailed error logging
-            import traceback
             error_details = traceback.format_exc()
             return {
                 "status": "error",
-                "message": f"Agent '{agent_name}' failed: {str(e)}",
+                "message": f"Agent '{agent_name}' threw an exception: {str(e)}",
                 "agent": agent_name,
                 "task_type": task_type,
                 "details": error_details
             }
-    
+
+    # ========================================================================
+    # VVVVVV CORE LOGIC: These two methods contain the definitive fix VVVVVVV
+    # ========================================================================
+
     def _determine_intent(self, query: str, has_files: bool) -> List[Dict[str, Any]]:
         """
-        Determines the sequence of tasks (a plan) based on the user's query and context.
-        This is the core of the "smarter" orchestrator.
+        Determines the sequence of tasks (a plan). This version is more robust
+        and handles missing context gracefully.
         """
         query_lower = query.lower() if query else ""
         plan = []
 
-        # --- Step 1: Handle File Input ---
-        if has_files:
-            plan.append({"task_type": "file_processing"})
-        
-        # --- Step 2: Determine Next Action based on Query Keywords ---
+        # --- INTENT KEYWORDS ---
+        file_keywords = ["pdf", "document", "file", "doc", "txt", "attachment"]
         analysis_keywords = ["summarize", "summary", "analyze", "insights", "report", "explain", "key points"]
         research_keywords = ["research", "google", "search web", "find information on", "look up"]
-        email_keywords = ["email", "draft", "mail", "inbox"]
-        calendar_keywords = ["schedule", "meeting", "calendar", "appointment"]
-
-        if any(keyword in query_lower for keyword in analysis_keywords):
-            # If there was a file, this analysis will use its content.
-            # If not, it will analyze the query text itself.
-            plan.append({"task_type": "analysis"})
-        elif any(keyword in query_lower for keyword in research_keywords):
-            plan.append({"task_type": "web_research"})
-        elif any(keyword in query_lower for keyword in email_keywords):
-            plan.append({"task_type": "email_analysis"}) # or draft_email, etc.
-        elif any(keyword in query_lower for keyword in calendar_keywords):
-            plan.append({"task_type": "schedule_meeting"})
-        elif query and not plan:
-            # If there's a query but no other intent matched, default to analysis.
-            plan.append({"task_type": "analysis"})
         
-        # If there are no files and no query, it's an invalid request.
-        if not plan:
-            return []
+        # --- LOGIC ---
+        # **Critical Check:** If the query implies a file but none is provided, create an error plan.
+        if any(keyword in query_lower for keyword in file_keywords) and not has_files:
+            return [{"task_type": "error", "message": "You mentioned a document, but no file was attached. Please upload a file."}]
+
+        # Step 1: Handle File Input
+        if has_files:
+            plan.append({"task_type": "file_processing"})
+            # If the query asks for analysis or is generic, chain the AnalysisAgent.
+            if any(keyword in query_lower for keyword in analysis_keywords) or not query_lower:
+                 plan.append({"task_type": "analysis"})
+
+        # Step 2: Handle other intents if no file-based plan was made
+        if not plan: 
+            if any(keyword in query_lower for keyword in analysis_keywords):
+                # An analysis task without a file means analyzing the query text itself.
+                plan.append({"task_type": "analysis"})
+            elif any(keyword in query_lower for keyword in research_keywords):
+                plan.append({"task_type": "web_research"})
+
+        # Default to analysis if there is a query but no other plan was made
+        if query and not plan:
+            plan.append({"task_type": "analysis"})
             
         return plan
 
-    # ========================================================================
-    # VVVVVV THIS IS THE FULLY REVISED, MORE POWERFUL ORCHESTRATOR VVVVVVVV
-    # ========================================================================
     async def execute_orchestration(self, task: Any, *args, **kwargs) -> Dict[str, Any]:
         """
-        Main orchestration method. It creates a dynamic plan and executes a chain of
-        agents to fulfill the user's request.
+        Main orchestration method. Creates a dynamic plan and executes a chain of
+        agents, ensuring a consistently structured response, even on error.
         """
+        print(f"Orchestrator received task: {task}")
+        
         # 1. Normalize Input
         if isinstance(task, str):
             task_dict = {"query": task}
         elif isinstance(task, dict):
-            task_dict = task
+            task_dict = task.copy()
         else:
-            return {"status": "error", "message": f"Invalid task type: {type(task)}"}
+            return {"status": "error", "summary": f"Invalid input type: {type(task)}", "agents_executed": [], "query": str(task)}
 
-        query = task_dict.get("query")
+        query = task_dict.get("query", "")
         files = task_dict.get("files")
         
         # 2. Create a Dynamic Plan
         plan = self._determine_intent(query, bool(files))
-        
-        if not plan:
-            return {"status": "error", "message": "Could not determine intent. Please provide a query or a file."}
+        print(f"Orchestrator created plan: {plan}")
+
+        # Handle error plans created by the intent detector (e.g., missing file)
+        if not plan or (plan[0].get("task_type") == "error"):
+            error_message = plan[0].get("message") if plan else "I'm sorry, I could not understand your request."
+            return {
+                "status": "error",
+                "summary": error_message,
+                "query": query,
+                "orchestration_metadata": {"plan": plan, "agents_executed": []}
+            }
 
         # 3. Execute the Plan (Agent Chain)
         agents_executed = []
-        # `last_result` will hold the data to be passed from one agent to the next.
-        # Start with the initial user request.
-        last_result = task_dict.copy()
-        
-        for i, step in enumerate(plan):
-            # Prepare the task for the current agent in the chain
-            current_task = {
-                "task_type": step["task_type"],
-                "query": query,
-            }
-            
-            # --- CRITICAL: Pass data between agents ---
-            # The FileAgent provides `extracted_text`. The AnalysisAgent needs it.
-            if "extracted_text" in last_result:
-                current_task["text_content"] = last_result["extracted_text"]
-            
-            # Pass files only to the file_processing agent
-            if step["task_type"] == "file_processing":
-                current_task["files"] = files
+        execution_context = task_dict 
 
-            # Execute the step
+        for i, step in enumerate(plan):
+            current_task_type = step["task_type"]
+            print(f"\n--- Executing Step {i+1}/{len(plan)}: Agent for '{current_task_type}' ---")
+
+            current_task = execution_context.copy()
+            current_task["task_type"] = current_task_type
+
+            # Pass extracted text to the analysis agent
+            if current_task_type == "analysis":
+                # If text was extracted from a file, use it. Otherwise, use the query itself.
+                current_task["text_content"] = execution_context.get("extracted_text", query)
+
             step_result = await self.execute_task(current_task)
+
+            # Merge results back into the context for the next agent
+            if step_result.get("results"):
+                 execution_context.update(step_result["results"])
             
-            # If any step in the chain fails, abort the entire plan.
-            if step_result.get("status") == "error":
-                step_result["orchestration_metadata"] = {
-                    "plan": plan,
-                    "failed_step": i + 1,
-                    "agents_executed": agents_executed,
+            execution_context["summary"] = step_result.get("summary", execution_context.get("summary"))
+            execution_context["status"] = step_result.get("status")
+            
+            agent_name = step_result.get("orchestrator_info", {}).get("selected_agent")
+            if agent_name:
+                agents_executed.append(agent_name)
+            
+            # If any step fails, abort and return a structured error response
+            if execution_context["status"] == "error":
+                print(f"--- Step Failed ---")
+                error_summary = step_result.get("message", "An unknown error occurred.")
+                return {
+                    "status": "error",
+                    "summary": f"Error during '{current_task_type}': {error_summary}",
+                    "query": query,
+                    "orchestration_metadata": {
+                        "plan": plan,
+                        "failed_step": i + 1,
+                        "agents_executed": agents_executed,
+                        "error_details": step_result
+                    }
                 }
-                return step_result
             
-            # Update agents_executed list and prepare data for the next step
-            agents_executed.append(step_result.get("orchestrator_info", {}).get("selected_agent", "UnknownAgent"))
-            
-            # The output of this step becomes the input for the next.
-            # We merge results, with newer results overwriting older ones.
-            # IMPORTANT: Your agents must return results in a consistent format.
-            # For example, FileAgent should return `{"extracted_text": "..."}`.
-            last_result.update(step_result.get("results", {}))
-            last_result["summary"] = step_result.get("summary") # Capture the most recent summary
+            print(f"--- Step {i+1} Completed. Agent: {agent_name} ---")
 
         # 4. Finalize the Response
-        final_summary = last_result.get("summary", "Task completed successfully.")
-        
-        final_response = {
+        print("\n--- Orchestration Complete ---")
+        final_summary = execution_context.get("summary", "Task completed, but no summary was generated.")
+
+        return {
             "status": "completed",
-            "query": query,
             "summary": final_summary,
-            # Return the actual data from the last agent
-            "results": last_result, 
+            "query": query,
+            "agents_executed": agents_executed, # Top-level for easy access
             "orchestration_metadata": {
                 "plan": plan,
                 "agents_executed": agents_executed,
-                "was_chained": len(agents_executed) > 1
+                "was_chained": len(agents_executed) > 1,
+                "final_context": execution_context
             }
         }
         
-        return final_response
-
-    # (Other methods like get_available_agents, etc., can remain as they were)
-    # ... include the rest of your class methods here ...
+    # Other helper methods can be included below
+    def _get_all_task_types(self) -> Dict[str, List[str]]:
+        return {
+            "spotlight": ["spotlight_search"],
+            "file": ["file_processing", "pdf_analysis", "document_extraction"],
+            "research": ["web_research", "competitor_analysis", "market_research", "safari_research"],
+            "analysis": ["analysis", "insights", "summary", "report_generation"],
+            "mail": ["email_analysis", "draft_email", "schedule_email", "email_insights"],
+            "calendar": ["schedule_meeting", "find_availability", "meeting_prep", "calendar_insights"]
+        }
