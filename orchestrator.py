@@ -201,38 +201,53 @@ class MultiAgentOrchestrator:
         
         return await self.execute_task(task)
     
-    async def execute_orchestration(self, task: Dict[str, Any], *args, **kwargs) -> Dict[str, Any]:
+    async def execute_orchestration(self, task, *args, **kwargs) -> Dict[str, Any]:
         """
         Main orchestration method that the frontend calls.
         This is the entry point for all task execution.
-        Handles variable arguments for backward compatibility.
+        Handles variable arguments and input types for backward compatibility.
         """
+        # Handle different input types
+        if isinstance(task, str):
+            # If task is a string, treat it as a query
+            task_dict = {"query": task}
+        elif isinstance(task, dict):
+            # If task is already a dictionary, use it as is
+            task_dict = task
+        else:
+            # Handle other types
+            return {
+                "status": "error",
+                "message": f"Invalid task type. Expected dict or str, got {type(task)}",
+                "task_type": str(type(task))
+            }
+        
         # Handle different request formats for backward compatibility
         
         # If it's a direct task, execute it
-        if "task_type" in task:
-            return await self.execute_task(task)
+        if "task_type" in task_dict:
+            return await self.execute_task(task_dict)
         
         # Handle file processing requests
-        if "files" in task:
+        if "files" in task_dict:
             # Auto-detect this is a file processing task
             file_task = {
                 "task_type": "file_processing",
-                "files": task.get("files"),
-                "query": task.get("query", ""),
-                **task  # Include any other parameters
+                "files": task_dict.get("files"),
+                "query": task_dict.get("query", ""),
+                **task_dict  # Include any other parameters
             }
             return await self.execute_task(file_task)
         
         # Handle query-based requests
-        if "query" in task:
-            return await self.route_task_intelligently(task["query"], task)
+        if "query" in task_dict:
+            return await self.route_task_intelligently(task_dict["query"], task_dict)
         
         # Fallback for unrecognized format
         return {
             "status": "error",
             "message": "Invalid task format. Expected 'task_type', 'files', or 'query'",
-            "received_keys": list(task.keys()),
+            "received_keys": list(task_dict.keys()),
             "args_received": len(args),
             "kwargs_received": list(kwargs.keys()) if kwargs else []
         }
