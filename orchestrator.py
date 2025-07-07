@@ -65,15 +65,14 @@ class MultiAgentOrchestrator:
             }
 
     # ========================================================================
-    # VVVVVV CORE LOGIC: These two methods contain the definitive fix VVVVVVV
+    # VVVVVV CORE LOGIC: This method contains the definitive fix VVVVVVV
     # ========================================================================
-
     def _determine_intent(self, query: str, has_files: bool) -> List[Dict[str, Any]]:
         """
-        Determines the sequence of tasks (a plan). This version is more robust
-        and handles missing context gracefully.
+        Determines the sequence of tasks (a plan). This version checks for
+        query substance before creating an analysis plan.
         """
-        query_lower = query.lower() if query else ""
+        query_lower = query.lower().strip() if query else ""
         plan = []
 
         # --- INTENT KEYWORDS ---
@@ -82,26 +81,32 @@ class MultiAgentOrchestrator:
         research_keywords = ["research", "google", "search web", "find information on", "look up"]
         
         # --- LOGIC ---
-        # **Critical Check:** If the query implies a file but none is provided, create an error plan.
+        
+        # 1. Check for invalid file-related queries
         if any(keyword in query_lower for keyword in file_keywords) and not has_files:
             return [{"task_type": "error", "message": "You mentioned a document, but no file was attached. Please upload a file."}]
 
-        # Step 1: Handle File Input
+        # 2. Check for analysis requests that lack substance
+        is_analysis_request = any(keyword in query_lower for keyword in analysis_keywords)
+        if is_analysis_request and not has_files:
+            # Check if the query is ONLY command words (e.g., "summarize", "analyze report")
+            query_words = set(query_lower.split())
+            command_words = set(analysis_keywords + ["the", "a", "an"]) # Add common articles
+            if query_words.issubset(command_words):
+                return [{"task_type": "error", "message": "You asked to summarize or analyze, but didn't provide enough text or a file. Please provide more content."}]
+
+        # 3. Build the valid plan
         if has_files:
             plan.append({"task_type": "file_processing"})
-            # If the query asks for analysis or is generic, chain the AnalysisAgent.
-            if any(keyword in query_lower for keyword in analysis_keywords) or not query_lower:
+            if is_analysis_request or not query_lower:
                  plan.append({"task_type": "analysis"})
-
-        # Step 2: Handle other intents if no file-based plan was made
-        if not plan: 
-            if any(keyword in query_lower for keyword in analysis_keywords):
-                # An analysis task without a file means analyzing the query text itself.
-                plan.append({"task_type": "analysis"})
-            elif any(keyword in query_lower for keyword in research_keywords):
-                plan.append({"task_type": "web_research"})
-
-        # Default to analysis if there is a query but no other plan was made
+        elif is_analysis_request:
+            # The query has substance and no file, so analyze the query text
+            plan.append({"task_type": "analysis"})
+        elif any(keyword in query_lower for keyword in research_keywords):
+            plan.append({"task_type": "web_research"})
+        
+        # 4. Default to analysis for generic queries with substance
         if query and not plan:
             plan.append({"task_type": "analysis"})
             
@@ -120,7 +125,7 @@ class MultiAgentOrchestrator:
         elif isinstance(task, dict):
             task_dict = task.copy()
         else:
-            return {"status": "error", "summary": f"Invalid input type: {type(task)}", "agents_executed": [], "query": str(task)}
+            return {"status": "error", "summary": f"Invalid input type: {type(task)}", "query": str(task), "agents_executed": []}
 
         query = task_dict.get("query", "")
         files = task_dict.get("files")
@@ -129,17 +134,18 @@ class MultiAgentOrchestrator:
         plan = self._determine_intent(query, bool(files))
         print(f"Orchestrator created plan: {plan}")
 
-        # Handle error plans created by the intent detector (e.g., missing file)
+        # Handle error plans from the intent detector (e.g., missing file, no substance)
         if not plan or (plan[0].get("task_type") == "error"):
             error_message = plan[0].get("message") if plan else "I'm sorry, I could not understand your request."
             return {
                 "status": "error",
                 "summary": error_message,
                 "query": query,
+                "agents_executed": [],
                 "orchestration_metadata": {"plan": plan, "agents_executed": []}
             }
 
-        # 3. Execute the Plan (Agent Chain)
+        # 3. Execute the Plan
         agents_executed = []
         execution_context = task_dict 
 
@@ -150,14 +156,11 @@ class MultiAgentOrchestrator:
             current_task = execution_context.copy()
             current_task["task_type"] = current_task_type
 
-            # Pass extracted text to the analysis agent
             if current_task_type == "analysis":
-                # If text was extracted from a file, use it. Otherwise, use the query itself.
                 current_task["text_content"] = execution_context.get("extracted_text", query)
 
             step_result = await self.execute_task(current_task)
 
-            # Merge results back into the context for the next agent
             if step_result.get("results"):
                  execution_context.update(step_result["results"])
             
@@ -168,7 +171,6 @@ class MultiAgentOrchestrator:
             if agent_name:
                 agents_executed.append(agent_name)
             
-            # If any step fails, abort and return a structured error response
             if execution_context["status"] == "error":
                 print(f"--- Step Failed ---")
                 error_summary = step_result.get("message", "An unknown error occurred.")
@@ -176,12 +178,8 @@ class MultiAgentOrchestrator:
                     "status": "error",
                     "summary": f"Error during '{current_task_type}': {error_summary}",
                     "query": query,
-                    "orchestration_metadata": {
-                        "plan": plan,
-                        "failed_step": i + 1,
-                        "agents_executed": agents_executed,
-                        "error_details": step_result
-                    }
+                    "agents_executed": agents_executed,
+                    "orchestration_metadata": {"plan": plan, "failed_step": i + 1, "error_details": step_result}
                 }
             
             print(f"--- Step {i+1} Completed. Agent: {agent_name} ---")
@@ -194,22 +192,17 @@ class MultiAgentOrchestrator:
             "status": "completed",
             "summary": final_summary,
             "query": query,
-            "agents_executed": agents_executed, # Top-level for easy access
-            "orchestration_metadata": {
-                "plan": plan,
-                "agents_executed": agents_executed,
-                "was_chained": len(agents_executed) > 1,
-                "final_context": execution_context
-            }
+            "agents_executed": agents_executed,
+            "orchestration_metadata": {"plan": plan, "agents_executed": agents_executed, "was_chained": len(agents_executed) > 1}
         }
         
-    # Other helper methods can be included below
     def _get_all_task_types(self) -> Dict[str, List[str]]:
+        # This method is not directly used by the new orchestrator but is good to keep for status checks
         return {
             "spotlight": ["spotlight_search"],
-            "file": ["file_processing", "pdf_analysis", "document_extraction"],
-            "research": ["web_research", "competitor_analysis", "market_research", "safari_research"],
-            "analysis": ["analysis", "insights", "summary", "report_generation"],
-            "mail": ["email_analysis", "draft_email", "schedule_email", "email_insights"],
-            "calendar": ["schedule_meeting", "find_availability", "meeting_prep", "calendar_insights"]
+            "file": ["file_processing"],
+            "research": ["web_research"],
+            "analysis": ["analysis"],
+            "mail": ["email_analysis"],
+            "calendar": ["schedule_meeting"]
         }
