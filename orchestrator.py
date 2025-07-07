@@ -222,14 +222,13 @@ class MultiAgentOrchestrator:
                 "task_type": str(type(task))
             }
         
+        # Execute the task
+        result = None
+        
         # Handle different request formats for backward compatibility
-        
-        # If it's a direct task, execute it
         if "task_type" in task_dict:
-            return await self.execute_task(task_dict)
-        
-        # Handle file processing requests
-        if "files" in task_dict:
+            result = await self.execute_task(task_dict)
+        elif "files" in task_dict:
             # Auto-detect this is a file processing task
             file_task = {
                 "task_type": "file_processing",
@@ -237,17 +236,42 @@ class MultiAgentOrchestrator:
                 "query": task_dict.get("query", ""),
                 **task_dict  # Include any other parameters
             }
-            return await self.execute_task(file_task)
+            result = await self.execute_task(file_task)
+        elif "query" in task_dict:
+            result = await self.route_task_intelligently(task_dict["query"], task_dict)
+        else:
+            return {
+                "status": "error",
+                "message": "Invalid task format. Expected 'task_type', 'files', or 'query'",
+                "received_keys": list(task_dict.keys()),
+                "args_received": len(args),
+                "kwargs_received": list(kwargs.keys()) if kwargs else []
+            }
         
-        # Handle query-based requests
-        if "query" in task_dict:
-            return await self.route_task_intelligently(task_dict["query"], task_dict)
+        # Ensure the result has the fields the frontend expects
+        if result:
+            # Add missing fields that frontend expects
+            if "query" not in result:
+                result["query"] = task_dict.get("query", "PDF Analysis")
+            
+            if "agents_executed" not in result:
+                agent_name = result.get("agent", "Unknown")
+                result["agents_executed"] = [agent_name] if agent_name != "Unknown" else []
+            
+            if "summary" not in result:
+                result["summary"] = result.get("summary", "Task completed successfully")
+            
+            # Ensure status is present
+            if "status" not in result:
+                result["status"] = "completed"
+            
+            # Add orchestration metadata for frontend compatibility
+            result["orchestration_metadata"] = {
+                "query": task_dict.get("query", "PDF Analysis"),
+                "agents_executed": result.get("agents_executed", [result.get("agent", "FileAgent")]),
+                "status": result.get("status", "completed"),
+                "summary": result.get("summary", "Task completed successfully"),
+                "task_type": task_dict.get("task_type", "auto-detected")
+            }
         
-        # Fallback for unrecognized format
-        return {
-            "status": "error",
-            "message": "Invalid task format. Expected 'task_type', 'files', or 'query'",
-            "received_keys": list(task_dict.keys()),
-            "args_received": len(args),
-            "kwargs_received": list(kwargs.keys()) if kwargs else []
-        }
+        return result
