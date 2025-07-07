@@ -226,10 +226,8 @@ class MultiAgentOrchestrator:
         result = None
         
         # Handle different request formats for backward compatibility
-        if "task_type" in task_dict:
-            result = await self.execute_task(task_dict)
-        elif "files" in task_dict:
-            # Auto-detect this is a file processing task
+        if "files" in task_dict:
+            # PRIORITY: File processing should be handled first
             file_task = {
                 "task_type": "file_processing",
                 "files": task_dict.get("files"),
@@ -237,6 +235,8 @@ class MultiAgentOrchestrator:
                 **task_dict  # Include any other parameters
             }
             result = await self.execute_task(file_task)
+        elif "task_type" in task_dict:
+            result = await self.execute_task(task_dict)
         elif "query" in task_dict:
             result = await self.route_task_intelligently(task_dict["query"], task_dict)
         else:
@@ -250,27 +250,38 @@ class MultiAgentOrchestrator:
         
         # Ensure the result has the fields the frontend expects
         if result:
+            # Extract the actual summary from the agent's response
+            agent_summary = result.get("summary", "")
+            if not agent_summary:
+                # Try to get summary from results
+                if "results" in result and isinstance(result["results"], dict):
+                    agent_summary = result["results"].get("summary", "")
+                    if not agent_summary:
+                        # For FileAgent, try to get from detailed_analysis
+                        if isinstance(result["results"], list) and len(result["results"]) > 0:
+                            first_result = result["results"][0]
+                            if "detailed_analysis" in first_result:
+                                analysis = first_result["detailed_analysis"]
+                                if "document_summary" in analysis:
+                                    agent_summary = "Document analysis completed with detailed insights"
+                                else:
+                                    agent_summary = f"Processed {first_result.get('filename', 'document')} successfully"
+            
+            if not agent_summary:
+                agent_summary = "Task completed successfully"
+            
             # Add missing fields that frontend expects
-            if "query" not in result:
-                result["query"] = task_dict.get("query", "PDF Analysis")
-            
-            if "agents_executed" not in result:
-                agent_name = result.get("agent", "Unknown")
-                result["agents_executed"] = [agent_name] if agent_name != "Unknown" else []
-            
-            if "summary" not in result:
-                result["summary"] = result.get("summary", "Task completed successfully")
-            
-            # Ensure status is present
-            if "status" not in result:
-                result["status"] = "completed"
+            result["query"] = task_dict.get("query", "Analysis Request")
+            result["agents_executed"] = [result.get("agent", "Unknown")]
+            result["summary"] = agent_summary
+            result["status"] = result.get("status", "completed")
             
             # Add orchestration metadata for frontend compatibility
             result["orchestration_metadata"] = {
-                "query": task_dict.get("query", "PDF Analysis"),
-                "agents_executed": result.get("agents_executed", [result.get("agent", "FileAgent")]),
-                "status": result.get("status", "completed"),
-                "summary": result.get("summary", "Task completed successfully"),
+                "query": result["query"],
+                "agents_executed": result["agents_executed"],
+                "status": result["status"], 
+                "summary": result["summary"],
                 "task_type": task_dict.get("task_type", "auto-detected")
             }
         
