@@ -3,6 +3,9 @@ import asyncio
 import traceback
 from datetime import datetime
 from abc import ABC, abstractmethod
+import PyPDF2
+import nltk
+nltk.download('punkt', quiet=True)
 
 
 class BaseAgent(ABC):
@@ -76,11 +79,26 @@ class FileAgent(BaseAgent):
                 "summary": "No files provided for processing"
             }
         
-        # Simulate file processing
-        await asyncio.sleep(0.2)
-        
         file_names = files if isinstance(files, list) else [files]
-        extracted_text = f"Extracted content from {len(file_names)} file(s)"
+        extracted_texts = []
+        
+        for file_path in file_names:
+            try:
+                with open(file_path, 'rb') as pdf_file:
+                    reader = PyPDF2.PdfReader(pdf_file)
+                    text = ''
+                    for page in reader.pages:
+                        page_text = page.extract_text()
+                        if page_text:  # Handle cases where extraction fails on a page
+                            text += page_text + '\n'
+                    extracted_texts.append(text.strip())  # Strip extra whitespace
+            except Exception as e:
+                return {
+                    "status": "error",
+                    "summary": f"Failed to process file {file_path}: {str(e)}"
+                }
+        
+        extracted_text = '\n\n'.join(extracted_texts)  # Combine texts if multiple files
         
         return {
             "summary": f"Successfully processed {len(file_names)} file(s)",
@@ -130,15 +148,18 @@ class AnalysisAgent(BaseAgent):
                 "summary": "No content provided for analysis"
             }
         
-        # Simulate analysis
-        await asyncio.sleep(0.2)
+        # Basic summarization: Extract first 3 sentences or truncate to 200 words
+        sentences = nltk.sent_tokenize(text_content)
+        summary_text = ' '.join(sentences[:3]) if len(sentences) >= 3 else text_content
+        if len(summary_text.split()) > 200:
+            summary_text = ' '.join(summary_text.split()[:200]) + '...'
         
-        # Check if this is from previous research
+        # Check if this is from previous research (keep your existing logic)
         if "key_findings" in str(task):
-            summary = "Created comprehensive competitive analysis report based on research findings. The AI automation market shows strong growth with major tech companies leading innovation."
+            summary = "Created comprehensive competitive analysis report based on research findings. " + summary_text
         else:
             word_count = len(text_content.split())
-            summary = f"Analyzed content ({word_count} words) and identified key themes and insights"
+            summary = f"Summary of content ({word_count} words): {summary_text}"
         
         return {
             "summary": summary,
