@@ -106,14 +106,14 @@ function displayResults(data) {
     let resultsHTML = `
         <div class="result-section">
             <h4>🎯 Orchestration Summary</h4>
-            <p><strong>Query:</strong> ${data.query}</p>
-            <p><strong>Agents Executed:</strong> ${data.agents_executed}</p>
-            <p><strong>Status:</strong> ${data.status}</p>
-            <p><strong>Summary:</strong> ${data.final_summary}</p>
+            <p><strong>Query:</strong> ${data.query || 'N/A'}</p>
+            <p><strong>Agents Executed:</strong> ${Array.isArray(data.agents_executed) ? data.agents_executed.join(', ') : 'None'}</p>
+            <p><strong>Status:</strong> ${data.status || 'Unknown'}</p>
+            <p><strong>Summary:</strong> ${data.summary || 'No summary available'}</p>
         </div>
     `;
 
-    // Display individual agent results
+    // Display individual agent results if available
     if (data.agent_results && data.agent_results.length > 0) {
         data.agent_results.forEach(result => {
             resultsHTML += `
@@ -133,6 +133,16 @@ function displayResults(data) {
         });
     }
 
+    // Display orchestration metadata if available
+    if (data.orchestration_metadata) {
+        resultsHTML += `
+            <details style="margin-top: 20px;">
+                <summary style="cursor: pointer; font-weight: bold;">🔧 Orchestration Details</summary>
+                <pre style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; margin-top: 10px; overflow-x: auto; white-space: pre-wrap;">${JSON.stringify(data.orchestration_metadata, null, 2)}</pre>
+            </details>
+        `;
+    }
+
     finalResults.innerHTML = resultsHTML;
 }
 
@@ -148,6 +158,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
 // Automator Mascot Introduction
 const mascotMessages = [
     "Hello! I'm your AI Automator assistant. Let me introduce our agent team! 🤖",
