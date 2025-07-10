@@ -1,486 +1,222 @@
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Union
 import asyncio
-import traceback
 from datetime import datetime
-from abc import ABC, abstractmethod
 import PyPDF2
-import nltk
-nltk.download('punkt', quiet=True)
-
-
-class BaseAgent(ABC):
-    """Base class for all agents with guaranteed response structure"""
-    
-    @abstractmethod
-    def can_handle(self, task_type: str) -> bool:
-        """Check if this agent can handle the given task type"""
-        pass
-    
-    @abstractmethod
-    async def _execute_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        """Agent-specific task execution logic"""
-        pass
-    
-    async def execute(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute task with guaranteed response structure"""
-        try:
-            # Execute the agent-specific logic
-            result = await self._execute_task(task)
-            
-            # Ensure we have a summary
-            if not result.get("summary"):
-                result["summary"] = self._generate_default_summary(task, result)
-            
-            # Ensure we have a status
-            if not result.get("status"):
-                result["status"] = "completed"
-            
-            return result
-            
-        except Exception as e:
-            error_msg = f"Error in {self.__class__.__name__}: {str(e)}"
-            return {
-                "status": "error",
-                "summary": error_msg,
-                "message": str(e),
-                "details": traceback.format_exc()
-            }
-    
-    def _generate_default_summary(self, task: Dict[str, Any], result: Dict[str, Any]) -> str:
-        """Generate a default summary if none provided"""
-        task_type = task.get("task_type", "task")
-        return f"Successfully completed {task_type} task"
-
-
-class SpotlightAgent(BaseAgent):
-    def can_handle(self, task_type: str) -> bool:
-        return task_type == "spotlight_search"
-    
-    async def _execute_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        query = task.get("query", "")
-        # Simulate spotlight search
-        await asyncio.sleep(0.1)
-        return {
-            "summary": f"Searched system for '{query}' and found 5 relevant items",
-            "results": {"items_found": 5, "query": query}
-        }
-
-
-class FileAgent(BaseAgent):
-    def can_handle(self, task_type: str) -> bool:
-        return task_type == "file_processing"
-    
-    async def _execute_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        files = task.get("files", [])
-        
-        if not files:
-            return {
-                "status": "error",
-                "summary": "No files provided for processing"
-            }
-        
-        file_names = files if isinstance(files, list) else [files]
-        extracted_texts = []
-        
-        for file_path in file_names:
-            try:
-                with open(file_path, 'rb') as pdf_file:
-                    reader = PyPDF2.PdfReader(pdf_file)
-                    text = ''
-                    for page in reader.pages:
-                        page_text = page.extract_text()
-                        if page_text:  # Handle cases where extraction fails on a page
-                            text += page_text + '\n'
-                    extracted_texts.append(text.strip())  # Strip extra whitespace
-            except Exception as e:
-                return {
-                    "status": "error",
-                    "summary": f"Failed to process file {file_path}: {str(e)}"
-                }
-        
-        extracted_text = '\n\n'.join(extracted_texts)  # Combine texts if multiple files
-        
-        return {
-            "summary": f"Successfully processed {len(file_names)} file(s)",
-            "results": {
-                "extracted_text": extracted_text,
-                "file_count": len(file_names),
-                "files_processed": file_names
-            }
-        }
-
-
-class ResearchAgent(BaseAgent):
-    def can_handle(self, task_type: str) -> bool:
-        return task_type == "web_research"
-    
-    async def _execute_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        query = task.get("query", task.get("text_content", ""))
-        
-        # Simulate web research
-        await asyncio.sleep(0.3)
-        
-        research_results = {
-            "sources": ["Source 1", "Source 2", "Source 3"],
-            "key_findings": [
-                "AI automation market growing at 30% CAGR",
-                "Key players include Microsoft, Google, Amazon",
-                "Market size expected to reach $50B by 2025"
-            ]
-        }
-        
-        return {
-            "summary": f"Researched '{query}' and found {len(research_results['sources'])} relevant sources with key market insights",
-            "results": research_results
-        }
-
-
-class AnalysisAgent(BaseAgent):
-    def can_handle(self, task_type: str) -> bool:
-        return task_type == "analysis"
-    
-    async def _execute_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        text_content = task.get("text_content", task.get("query", ""))
-        
-        if not text_content:
-            return {
-                "status": "error",
-                "summary": "No content provided for analysis"
-            }
-        
-        # Basic summarization: Extract first 3 sentences or truncate to 200 words
-        sentences = nltk.sent_tokenize(text_content)
-        summary_text = ' '.join(sentences[:3]) if len(sentences) >= 3 else text_content
-        if len(summary_text.split()) > 200:
-            summary_text = ' '.join(summary_text.split()[:200]) + '...'
-        
-        # Check if this is from previous research (keep your existing logic)
-        if "key_findings" in str(task):
-            summary = "Created comprehensive competitive analysis report based on research findings. " + summary_text
-        else:
-            word_count = len(text_content.split())
-            summary = f"Summary of content ({word_count} words): {summary_text}"
-        
-        return {
-            "summary": summary,
-            "results": {
-                "analysis_type": "competitive_analysis" if "research" in text_content.lower() else "general_analysis",
-                "confidence": 0.85
-            }
-        }
-
-
-class MailAgent(BaseAgent):
-    def can_handle(self, task_type: str) -> bool:
-        return task_type == "email_analysis"
-    
-    async def _execute_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        # Simulate email analysis
-        await asyncio.sleep(0.1)
-        return {
-            "summary": "Analyzed email inbox and found 10 important messages requiring attention",
-            "results": {"important_emails": 10}
-        }
-
-
-class CalendarAgent(BaseAgent):
-    def can_handle(self, task_type: str) -> bool:
-        return task_type == "schedule_meeting"
-    
-    async def _execute_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        # Simulate calendar scheduling
-        await asyncio.sleep(0.1)
-        return {
-            "summary": "Found 3 available time slots for the requested meeting",
-            "results": {"available_slots": 3}
-        }
 
 
 class MultiAgentOrchestrator:
-    """Orchestrator that guarantees proper response structure"""
+    """Simple orchestrator that routes tasks to appropriate agents"""
     
-    def __init__(self):
-        self.agents = {
-            "spotlight": SpotlightAgent(),
-            "file": FileAgent(),
-            "research": ResearchAgent(),
-            "analysis": AnalysisAgent(),
-            "mail": MailAgent(),
-            "calendar": CalendarAgent()
+    async def process_file(self, files: List[str]) -> Dict[str, Any]:
+        """Process PDF files and extract text"""
+        if not files:
+            return {
+                "status": "error",
+                "summary": "No files provided"
+            }
+        
+        all_text = []
+        for file_path in files:
+            try:
+                with open(file_path, 'rb') as pdf_file:
+                    reader = PyPDF2.PdfReader(pdf_file)
+                    text = ""
+                    for page in reader.pages:
+                        page_text = page.extract_text()
+                        if page_text:
+                            text += page_text + "\n"
+                    all_text.append(text.strip())
+            except Exception as e:
+                return {
+                    "status": "error",
+                    "summary": f"Failed to read PDF: {str(e)}"
+                }
+        
+        combined_text = "\n\n".join(all_text)
+        return {
+            "status": "completed",
+            "summary": f"Extracted text from {len(files)} file(s)",
+            "extracted_text": combined_text
         }
     
-    def find_capable_agents(self, task_type: str) -> List[str]:
-        """Find agents capable of handling the task type"""
-        return [name for name, agent in self.agents.items() 
-                if agent.can_handle(task_type)]
+    async def analyze_text(self, text: str) -> Dict[str, Any]:
+        """Simple text analysis without NLTK"""
+        if not text:
+            return {
+                "status": "error",
+                "summary": "No text to analyze"
+            }
+        
+        # Simple analysis
+        words = text.split()
+        word_count = len(words)
+        
+        # Create a simple summary (first 100 words)
+        summary_words = words[:100] if word_count > 100 else words
+        short_summary = " ".join(summary_words)
+        if word_count > 100:
+            short_summary += "..."
+        
+        return {
+            "status": "completed",
+            "summary": f"Analyzed {word_count} words: {short_summary[:200]}..."
+        }
     
-    async def execute_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute a single task with proper error handling"""
-        task_type = task.get("task_type", "")
+    async def research_topic(self, query: str) -> Dict[str, Any]:
+        """Simulate web research"""
+        await asyncio.sleep(0.1)  # Simulate API call
         
-        if not task_type:
-            return {
-                "status": "error",
-                "summary": "No task type specified",
-                "message": "Task must include a 'task_type' field"
-            }
-        
-        capable_agents = self.find_capable_agents(task_type)
-        
-        if not capable_agents:
-            return {
-                "status": "error",
-                "summary": f"No agent available for task type: {task_type}",
-                "message": f"Task type '{task_type}' is not supported"
-            }
-        
-        agent_name = capable_agents[0]
-        agent = self.agents[agent_name]
-        
-        try:
-            result = await agent.execute(task)
-            
-            # Add orchestrator metadata
-            if "orchestrator_info" not in result:
-                result["orchestrator_info"] = {}
-            
-            result["orchestrator_info"].update({
-                "selected_agent": agent_name,
-                "task_type": task_type,
-                "timestamp": datetime.now().isoformat()
-            })
-            
-            return result
-            
-        except Exception as e:
-            return {
-                "status": "error",
-                "summary": f"Agent '{agent_name}' failed: {str(e)}",
-                "message": str(e),
-                "details": traceback.format_exc(),
-                "agent": agent_name,
-                "task_type": task_type
-            }
+        return {
+            "status": "completed",
+            "summary": f"Researched '{query}' - Found information about market trends, key players, and growth projections",
+            "findings": [
+                "Market growing at 30% annually",
+                "Major players: Microsoft, Google, Amazon",
+                "Expected to reach $50B by 2025"
+            ]
+        }
     
-    def _determine_intent(self, query: str, has_files: bool) -> List[Dict[str, Any]]:
-        """Determine the execution plan based on query analysis"""
+    def determine_task_type(self, query: str, has_files: bool) -> str:
+        """Simple task type detection"""
         if not query:
             query = ""
         
-        query_lower = query.lower().strip()
-        plan = []
+        query_lower = query.lower()
         
-        # Keywords for different intents
-        file_keywords = ["pdf", "document", "file", "doc", "txt", "attachment", "upload"]
-        analysis_keywords = ["summarize", "summary", "analyze", "analysis", "insights", 
-                           "report", "explain", "key points", "brief", "overview"]
-        research_keywords = ["research", "google", "search web", "find information", 
-                           "look up", "market", "competitive", "industry"]
-        email_keywords = ["email", "mail", "inbox", "messages"]
-        calendar_keywords = ["schedule", "meeting", "calendar", "appointment"]
-        
-        # Check for file-related requests without files
-        mentions_file = any(keyword in query_lower for keyword in file_keywords)
-        wants_analysis = any(keyword in query_lower for keyword in analysis_keywords)
-        wants_research = any(keyword in query_lower for keyword in research_keywords)
-        
-        # Validation checks
-        if mentions_file and not has_files:
-            return [{
-                "task_type": "error",
-                "message": "You mentioned a file but didn't upload any. Please attach a file and try again."
-            }]
-        
-        # Build execution plan
+        # Check for file processing
         if has_files:
-            plan.append({"task_type": "file_processing"})
-            if wants_analysis or not query:  # Default to analysis for files
-                plan.append({"task_type": "analysis"})
+            return "file_and_analyze"
         
-        elif wants_research:
-            plan.append({"task_type": "web_research"})
-            if wants_analysis or "report" in query_lower:
-                plan.append({"task_type": "analysis"})
+        # Check for research
+        if any(word in query_lower for word in ["research", "find", "search", "look up"]):
+            return "research"
         
-        elif wants_analysis:
-            # Check if there's enough content to analyze
-            content_words = [w for w in query_lower.split() 
-                           if w not in analysis_keywords + ["the", "a", "an", "this", "that"]]
-            if len(content_words) < 3:
-                return [{
-                    "task_type": "error",
-                    "message": "Please provide more content to analyze, or upload a file."
-                }]
-            plan.append({"task_type": "analysis"})
+        # Check for analysis
+        if any(word in query_lower for word in ["analyze", "summarize", "summary"]):
+            if "pdf" in query_lower or "file" in query_lower or "document" in query_lower:
+                return "need_file"
+            return "analyze"
         
-        elif any(keyword in query_lower for keyword in email_keywords):
-            plan.append({"task_type": "email_analysis"})
-        
-        elif any(keyword in query_lower for keyword in calendar_keywords):
-            plan.append({"task_type": "schedule_meeting"})
-        
-        else:
-            # Default to analysis if query has substance
-            if len(query.split()) > 3:
-                plan.append({"task_type": "analysis"})
-            else:
-                return [{
-                    "task_type": "error",
-                    "message": "I couldn't understand what you'd like me to do. Please provide more details."
-                }]
-        
-        return plan
+        # Default
+        return "analyze" if len(query.split()) > 5 else "unclear"
     
     async def execute_orchestration(self, task: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
-        """Main orchestration method with guaranteed response structure"""
-        try:
-            # Normalize input
-            if isinstance(task, str):
-                task_dict = {"query": task}
-            elif isinstance(task, dict):
-                task_dict = task.copy()
-            else:
-                return self._error_response(
-                    "Invalid input type",
-                    f"Expected string or dict, got {type(task)}",
-                    query=str(task)
-                )
+        """Main orchestration method"""
+        # Normalize input
+        if isinstance(task, str):
+            query = task
+            files = None
+        else:
+            query = task.get("query", "")
+            files = task.get("files")
+        
+        # Determine what to do
+        task_type = self.determine_task_type(query, bool(files))
+        
+        # Handle different task types
+        if task_type == "need_file":
+            return {
+                "status": "error",
+                "summary": "You mentioned a file but didn't upload any. Please attach a file.",
+                "query": query,
+                "agents_executed": []
+            }
+        
+        elif task_type == "unclear":
+            return {
+                "status": "error",
+                "summary": "I couldn't understand your request. Please provide more details.",
+                "query": query,
+                "agents_executed": []
+            }
+        
+        elif task_type == "file_and_analyze":
+            # Process file first
+            file_result = await self.process_file(files)
+            if file_result["status"] == "error":
+                return {
+                    "status": "error",
+                    "summary": file_result["summary"],
+                    "query": query,
+                    "agents_executed": ["file"]
+                }
             
-            query = task_dict.get("query", "")
-            files = task_dict.get("files")
+            # Then analyze the extracted text
+            analysis_result = await self.analyze_text(file_result["extracted_text"])
+            return {
+                "status": "completed",
+                "summary": f"{file_result['summary']}. {analysis_result['summary']}",
+                "query": query,
+                "agents_executed": ["file", "analysis"]
+            }
+        
+        elif task_type == "research":
+            # Do research
+            research_result = await self.research_topic(query)
             
-            # Create execution plan
-            plan = self._determine_intent(query, bool(files))
-            
-            # Handle error plans
-            if plan and plan[0].get("task_type") == "error":
-                return self._error_response(
-                    plan[0].get("message", "Invalid request"),
-                    "Request validation failed",
-                    query=query
-                )
-            
-            # Execute plan
-            agents_executed = []
-            execution_context = task_dict.copy()
-            final_summary_parts = []
-            
-            for i, step in enumerate(plan):
-                task_type = step["task_type"]
-                
-                # Prepare task for current step
-                current_task = execution_context.copy()
-                current_task["task_type"] = task_type
-                
-                # Special handling for analysis tasks
-                if task_type == "analysis":
-                    # Use extracted text from files or original query
-                    current_task["text_content"] = execution_context.get("extracted_text", query)
-                
-                # Execute task
-                result = await self.execute_task(current_task)
-                
-                # Track execution
-                agent_name = result.get("orchestrator_info", {}).get("selected_agent", "unknown")
-                agents_executed.append(agent_name)
-                
-                # Collect summary
-                if result.get("summary"):
-                    final_summary_parts.append(result["summary"])
-                
-                # Handle errors
-                if result.get("status") == "error":
-                    return self._error_response(
-                        result.get("summary", "Task failed"),
-                        result.get("message", "Unknown error"),
-                        query=query,
-                        agents_executed=agents_executed,
-                        failed_step=i + 1,
-                        plan=plan
-                    )
-                
-                # Update context with results
-                if result.get("results"):
-                    execution_context.update(result["results"])
-            
-            # Build final summary
-            if final_summary_parts:
-                final_summary = " ".join(final_summary_parts)
-            else:
-                final_summary = f"Completed {len(agents_executed)} task(s) successfully"
+            # If they want a report, add analysis
+            if "report" in query.lower() or "analysis" in query.lower():
+                findings_text = "\n".join(research_result.get("findings", []))
+                analysis_result = await self.analyze_text(f"{query}\n\nFindings:\n{findings_text}")
+                return {
+                    "status": "completed",
+                    "summary": f"{research_result['summary']}. Created analysis report.",
+                    "query": query,
+                    "agents_executed": ["research", "analysis"]
+                }
             
             return {
                 "status": "completed",
-                "summary": final_summary,
+                "summary": research_result["summary"],
                 "query": query,
-                "agents_executed": agents_executed,
-                "orchestration_metadata": {
-                    "plan": plan,
-                    "agents_executed": agents_executed,
-                    "was_chained": len(agents_executed) > 1,
-                    "timestamp": datetime.now().isoformat()
-                }
+                "agents_executed": ["research"]
             }
-            
-        except Exception as e:
-            return self._error_response(
-                "Orchestration failed",
-                str(e),
-                query=task_dict.get("query", "") if isinstance(task_dict, dict) else str(task)
-            )
-    
-    def _error_response(self, summary: str, message: str, **kwargs) -> Dict[str, Any]:
-        """Create a consistent error response"""
-        response = {
+        
+        elif task_type == "analyze":
+            # Direct text analysis
+            analysis_result = await self.analyze_text(query)
+            return {
+                "status": "completed",
+                "summary": analysis_result["summary"],
+                "query": query,
+                "agents_executed": ["analysis"]
+            }
+        
+        # Fallback
+        return {
             "status": "error",
-            "summary": summary,
-            "message": message,
-            "query": kwargs.get("query", ""),
-            "agents_executed": kwargs.get("agents_executed", [])
+            "summary": "Unable to process request",
+            "query": query,
+            "agents_executed": []
         }
-        
-        # Add any additional metadata
-        if any(k for k in kwargs if k not in ["query", "agents_executed"]):
-            response["orchestration_metadata"] = {
-                k: v for k, v in kwargs.items() 
-                if k not in ["query", "agents_executed"]
-            }
-        
-        return response
 
 
-# Example usage and testing
+# Testing
 async def test_orchestrator():
     orchestrator = MultiAgentOrchestrator()
     
-    test_cases = [
-        # Test 1: Research and analysis
-        {
-            "query": "Research AI automation market and create competitive analysis report"
-        },
-        # Test 2: File request without file
-        {
-            "query": "read and summarize pdf"
-        },
-        # Test 3: Simple analysis
-        {
-            "query": "Analyze this text: The quick brown fox jumps over the lazy dog"
-        },
-        # Test 4: With file
-        {
-            "query": "summarize this document",
-            "files": ["document.pdf"]
-        }
-    ]
+    # Test 1: Research request
+    print("\n=== Test 1: Research ===")
+    result = await orchestrator.execute_orchestration(
+        "Research AI automation market and create competitive analysis report"
+    )
+    print(f"Status: {result['status']}")
+    print(f"Summary: {result['summary']}")
+    print(f"Agents: {result['agents_executed']}")
     
-    for i, test in enumerate(test_cases, 1):
-        print(f"\n=== Test Case {i} ===")
-        result = await orchestrator.execute_orchestration(test)
-        print(f"Query: {result['query']}")
-        print(f"Status: {result['status']}")
-        print(f"Summary: {result['summary']}")
-        print(f"Agents: {result['agents_executed']}")
-        print("-" * 50)
+    # Test 2: File without upload
+    print("\n=== Test 2: Missing File ===")
+    result = await orchestrator.execute_orchestration("read and summarize pdf")
+    print(f"Status: {result['status']}")
+    print(f"Summary: {result['summary']}")
+    
+    # Test 3: Simple analysis
+    print("\n=== Test 3: Text Analysis ===")
+    result = await orchestrator.execute_orchestration(
+        "Analyze this text: The quick brown fox jumps over the lazy dog"
+    )
+    print(f"Status: {result['status']}")
+    print(f"Summary: {result['summary']}")
 
 
 if __name__ == "__main__":
