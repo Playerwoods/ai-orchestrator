@@ -4,7 +4,9 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 import os
+import tempfile
 from orchestrator import MultiAgentOrchestrator
+
 app = FastAPI(
     title="AI Document Orchestrator",
     description="Multi-agent AI orchestration platform",
@@ -42,19 +44,27 @@ async def execute_orchestration(
 ):
     """Main orchestration endpoint"""
     try:
-        # Process uploaded files
-        file_data = []
+        # Process uploaded files and save them temporarily
+        file_paths = []
         for file in files:
-            content = await file.read()
-            file_data.append({
-                "filename": file.filename,
-                "content": content,
-                "size": len(content),
-                "content_type": file.content_type
-            })
+            # Create a temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{file.filename}") as tmp_file:
+                content = await file.read()
+                tmp_file.write(content)
+                file_paths.append(tmp_file.name)
         
-        # Execute orchestration
-        result = await orchestrator.execute_orchestration(query, file_data)
+        # Execute orchestration with a single dictionary argument
+        result = await orchestrator.execute_orchestration({
+            "query": query,
+            "files": file_paths if file_paths else None
+        })
+        
+        # Clean up temporary files
+        for file_path in file_paths:
+            try:
+                os.remove(file_path)
+            except:
+                pass
         
         return {
             "success": True,
@@ -62,6 +72,14 @@ async def execute_orchestration(
         }
         
     except Exception as e:
+        # Clean up files on error too
+        if 'file_paths' in locals():
+            for file_path in file_paths:
+                try:
+                    os.remove(file_path)
+                except:
+                    pass
+        
         return {
             "success": False,
             "error": str(e),
@@ -71,7 +89,13 @@ async def execute_orchestration(
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "agents": list(orchestrator.agents.keys())}
+    # Check if orchestrator has the simple methods (from the new simple version)
+    agent_info = {
+        "file_processing": hasattr(orchestrator, 'process_file'),
+        "analysis": hasattr(orchestrator, 'analyze_text'),
+        "research": hasattr(orchestrator, 'research_topic')
+    }
+    return {"status": "healthy", "capabilities": agent_info}
 
 if __name__ == "__main__":
     import uvicorn
