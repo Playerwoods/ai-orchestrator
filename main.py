@@ -1,5 +1,7 @@
-# main.py  (copy-paste entire file)
-import os, asyncio, json, textwrap
+# main.py  (copy everything below)
+import os
+import asyncio
+import json
 from datetime import datetime
 from typing import List, Dict, Any
 
@@ -8,10 +10,9 @@ from fastapi.responses import HTMLResponse
 from openai import AsyncOpenAI
 
 # -------------------------------------------------
-# FastAPI init
+# FastAPI setup
 # -------------------------------------------------
 app = FastAPI(title="Apple AI Orchestrator 2.0")
-
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # -------------------------------------------------
@@ -35,7 +36,7 @@ async def mail_agent(query: str) -> Dict[str, Any]:
 
 async def calendar_agent(query: str) -> Dict[str, Any]:
     await asyncio.sleep(0.5)
-    return {"summary": "Calendar updated"}
+    return {"summary": "Calendar updated with new event(s)"}
 
 AGENTS = {
     "file_agent": file_agent,
@@ -46,7 +47,7 @@ AGENTS = {
 }
 
 # -------------------------------------------------
-# Single endpoint
+# /execute endpoint
 # -------------------------------------------------
 @app.post("/execute")
 async def execute(
@@ -54,6 +55,7 @@ async def execute(
     files: List[UploadFile] = File([])
 ):
     start = datetime.utcnow()
+    # naive agent selection
     to_run = ["analysis_agent"]
     if files:
         to_run.insert(0, "file_agent")
@@ -95,20 +97,17 @@ async def execute(
     }
 
 # -------------------------------------------------
-# Serve the front-end HTML (embedded)
+# Serve front-end (embedded)
 # -------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def index():
-    return HTMLResponse(content=FRONTEND_HTML)
+    return HTMLResponse(content=FRONTEND)
 
-# -------------------------------------------------
-# The exact HTML/CSS/JS you posted, minified into one string
-# -------------------------------------------------
-FRONTEND_HTML = textwrap.dedent("""
+FRONTEND = """
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Apple AI Orchestrator 2.0</title>
 <style>
 *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif}
@@ -142,4 +141,69 @@ button:disabled{opacity:.5;cursor:not-allowed}
  </header>
 
  <main>
-  
+  <div class="stats-grid">
+   <div class="stat-card"><div class="stat-number">5</div><div class="stat-label">AI Agents</div></div>
+   <div class="stat-card"><div class="stat-number">∞</div><div class="stat-label">Workflows</div></div>
+   <div class="stat-card"><div class="stat-number">🔒</div><div class="stat-label">Privacy First</div></div>
+  </div>
+
+  <div class="orchestrator-panel">
+   <h2>🎯 Multi-Agent Orchestration</h2>
+   <textarea id="queryInput" placeholder="Tell the AI what you need..." rows="3"></textarea>
+   <input type="file" id="fileInput" multiple style="display:none"/>
+   <label for="fileInput" style="cursor:pointer;color:#007aff;text-decoration:underline">📎 Upload Documents</label><br/>
+   <button onclick="executeOrchestration()" id="executeBtn">🚀 Execute Orchestration</button>
+
+   <h3>💡 Example Orchestrations</h3>
+   <div class="examples-grid">
+    <button class="example-btn" onclick="setExample('Schedule a meeting about AI automation strategy')">📅 Schedule Meeting</button>
+    <button class="example-btn" onclick="setExample('Extract action items from uploaded documents')">📧 Extract Action Items</button>
+    <button class="example-btn" onclick="setExample('Block deep-work time for quarterly planning')">⏰ Time Blocking</button>
+    <button class="example-btn" onclick="setExample('Research AI automation market')">🔍 Market Research</button>
+    <button class="example-btn" onclick="setExample('Prepare for tomorrow board meeting')">🎯 Meeting Prep</button>
+    <button class="example-btn" onclick="setExample('Analyze uploaded PDFs and extract insights')">📊 Document Analysis</button>
+   </div>
+
+   <h3>🤖 Available Agents</h3>
+   <div class="agent-cards">
+    <div class="agent-card"><div class="agent-icon">📄</div><div class="agent-name">File Agent</div><div class="agent-desc">PDF processing, text extraction</div></div>
+    <div class="agent-card"><div class="agent-icon">🔍</div><div class="agent-name">Research Agent</div><div class="agent-desc">Web search, market analysis</div></div>
+    <div class="agent-card"><div class="agent-icon">🧠</div><div class="agent-name">Analysis Agent</div><div class="agent-desc">AI insights & synthesis</div></div>
+    <div class="agent-card"><div class="agent-icon">📧</div><div class="agent-name">Mail Agent</div><div class="agent-desc">Email drafting & scheduling</div></div>
+    <div class="agent-card"><div class="agent-icon">📅</div><div class="agent-name">Calendar Agent</div><div class="agent-desc">Meeting scheduling & time blocking</div></div>
+   </div>
+  </div>
+
+  <div id="resultsContainer" class="hidden">
+   <h2>🎯 Orchestration Results</h2>
+   <div id="agentProgress"></div>
+   <div id="finalResults"></div>
+  </div>
+ </main>
+</div>
+
+<script>
+function setExample(t){document.getElementById('queryInput').value=t}
+async function executeOrchestration(){
+ const q=document.getElementById('queryInput').value.trim();
+ const btn=document.getElementById('executeBtn');
+ if(!q){alert('Enter a query');return}
+ btn.textContent='🔄 Orchestrating...';btn.disabled=true;
+ document.getElementById('resultsContainer').classList.remove('hidden');
+ document.getElementById('agentProgress').innerHTML='<div class="agent-step executing">🚀 Initializing...</div>';
+ document.getElementById('finalResults').innerHTML='';
+ const fd=new FormData();fd.append('query',q);
+ [...document.getElementById('fileInput').files].forEach(f=>fd.append('files',f));
+ try{
+  const r=await fetch('/execute',{method:'POST',body:fd});
+  const d=await r.json();
+  if(!d.success) throw new Error(d.error||'Unknown');
+  document.getElementById('finalResults').innerHTML='<pre style="white-space:pre-wrap">'+JSON.stringify(d.data,null,2)+'</pre>';
+ }catch(e){
+  document.getElementById('finalResults').innerHTML='<div class="result-section" style="border-color:#f44336"><h4>❌ Error</h4><p>'+e.message+'</p></div>';
+ }finally{btn.textContent='🚀 Execute Orchestration';btn.disabled=false;}
+}
+</script>
+</body>
+</html>
+"""
