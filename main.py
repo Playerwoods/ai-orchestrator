@@ -1,7 +1,8 @@
-# main.py  (copy everything below)
+# main.py  —  entire file, drop-in replacement
 import os
 import asyncio
 import json
+import httpx
 from datetime import datetime
 from typing import List, Dict, Any
 
@@ -10,21 +11,43 @@ from fastapi.responses import HTMLResponse
 from openai import AsyncOpenAI
 
 # -------------------------------------------------
-# FastAPI setup
+# FastAPI app
 # -------------------------------------------------
 app = FastAPI(title="Apple AI Orchestrator 2.0")
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # -------------------------------------------------
-# Stub agents (replace with real logic later)
+# Environment keys
+# -------------------------------------------------
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+SERPER_API_KEY = os.getenv("SERPER_API_KEY")  # <- your Serper key is read here
+
+client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+
+# -------------------------------------------------
+# Real Research-Agent using Serper
+# -------------------------------------------------
+async def research_agent(query: str) -> Dict[str, Any]:
+    if not SERPER_API_KEY:
+        return {"summary": "No SERPER_API_KEY configured."}
+
+    payload = {"q": query, "num": 5}
+    headers = {"X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json"}
+
+    async with httpx.AsyncClient() as http:
+        r = await http.post("https://google.serper.dev/search", json=payload, headers=headers)
+        r.raise_for_status()
+        data = r.json()
+
+    organic = data.get("organic", [])
+    summary = "\n".join([f"{i+1}. {o['title']} ({o['link']})" for i, o in enumerate(organic[:3])])
+    return {"summary": summary or "No results found."}
+
+# -------------------------------------------------
+# Stub agents
 # -------------------------------------------------
 async def file_agent(query: str, files: List[UploadFile]) -> Dict[str, Any]:
     await asyncio.sleep(0.5)
-    return {"summary": f"Processed {len(files)} file(s) for: {query[:60]}…"}
-
-async def research_agent(query: str) -> Dict[str, Any]:
-    await asyncio.sleep(0.6)
-    return {"summary": f"Research summary for '{query[:60]}…'"}
+    return {"summary": f"Processed {len(files)} file(s)."}
 
 async def analysis_agent(query: str) -> Dict[str, Any]:
     await asyncio.sleep(0.7)
@@ -32,11 +55,11 @@ async def analysis_agent(query: str) -> Dict[str, Any]:
 
 async def mail_agent(query: str) -> Dict[str, Any]:
     await asyncio.sleep(0.4)
-    return {"summary": "Email drafted & queued"}
+    return {"summary": "Email drafted"}
 
 async def calendar_agent(query: str) -> Dict[str, Any]:
     await asyncio.sleep(0.5)
-    return {"summary": "Calendar updated with new event(s)"}
+    return {"summary": "Calendar updated"}
 
 AGENTS = {
     "file_agent": file_agent,
@@ -55,7 +78,6 @@ async def execute(
     files: List[UploadFile] = File([])
 ):
     start = datetime.utcnow()
-    # naive agent selection
     to_run = ["analysis_agent"]
     if files:
         to_run.insert(0, "file_agent")
@@ -97,14 +119,13 @@ async def execute(
     }
 
 # -------------------------------------------------
-# Serve front-end (embedded)
+# Serve front-end
 # -------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def index():
-    return HTMLResponse(content=FRONTEND)
+    return HTMLResponse(content=INDEX_HTML)
 
-FRONTEND = """
-<!doctype html>
+INDEX_HTML = """<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -205,5 +226,4 @@ async function executeOrchestration(){
 }
 </script>
 </body>
-</html>
-"""
+</html>"""
